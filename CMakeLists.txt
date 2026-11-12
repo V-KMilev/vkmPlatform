@@ -108,3 +108,10 @@ if(VKM_PLATFORM_PROFILER)
     target_compile_definitions(${PROJECT_NAME} PRIVATE VKM_PLATFORM_PROFILER=1)
     target_link_libraries(${PROJECT_NAME} PRIVATE TracyClient)
 endif()
+
+# The suite (tests/), built when the consumer asks for it.
+option(VKM_PLATFORM_BUILD_TESTS "Build the vkm_platform test suite" OFF)
+if(VKM_PLATFORM_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()

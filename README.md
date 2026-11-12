@@ -68,10 +68,11 @@ includes `vkm_platform/glfw_api.h`, the one way to GLFW's header. GLFW is static
 sets `GLFW_LIBRARY_TYPE` to `SHARED` first, which it must when something else of its own links GLFW
 too.
 
-| Option                  | Default | What                                                                    |
-|-------------------------|---------|-------------------------------------------------------------------------|
-| `VKM_PLATFORM_ASSERTS`  | `OFF`   | The library's asserts run whatever the build type (`-UNDEBUG` on its own sources) |
-| `VKM_PLATFORM_PROFILER` | `OFF`   | `SwapBuffers` and `FrameLimiter` as Tracy zones; needs the consumer's `TracyClient` target |
+| Option                     | Default | What                                                                                       |
+|----------------------------|---------|--------------------------------------------------------------------------------------------|
+| `VKM_PLATFORM_ASSERTS`     | `OFF`   | The library's asserts run whatever the build type (`-UNDEBUG` on its own sources)          |
+| `VKM_PLATFORM_PROFILER`    | `OFF`   | `SwapBuffers` and `FrameLimiter` as Tracy zones; needs the consumer's `TracyClient` target |
+| `VKM_PLATFORM_BUILD_TESTS` | `OFF`   | Builds `vkm_platform_tests`: each test a CTest of its own, labeled `vkm_platform`          |
 
 ## What it holds
 
@@ -91,6 +92,15 @@ too.
 | `windows_api.h`                | The Windows headers, for the library's own sources                   |
 
 Each is under `src/vkm_platform/`.
+
+## Tests
+
+`tests/` holds the library's own suite, built with `VKM_PLATFORM_BUILD_TESTS`: each test is
+`TEST("what works")` in `tests/<topic>.cpp`, a CTest named `vkm_platform: <what works>` and run in a
+process of its own, so `ctest -L vkm_platform` runs them in the tree of a consumer that calls
+`enable_testing()`, with `-C <config>` under a multi-config generator. Beside them, CTests of the
+library as a consumer builds it: its includes, its CMake, and its debug flags. Nothing there opens a
+window: creating one, its callbacks, cursor modes, fullscreen, monitors and the icon are walked by hand.
 
 ## In vkmEngine
 
