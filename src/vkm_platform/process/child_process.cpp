@@ -7,6 +7,7 @@
 #if !defined(_WIN32)
     #include <cerrno>
     #include <csignal>
+    #include <cstring>
     #include <fcntl.h>
     #include <poll.h>
     #include <sys/wait.h>
@@ -44,6 +45,21 @@ std::wstring quoted(const std::wstring& arg) {
     }
     out.append(slashes * 2, L'\\');
     return out + L"\"";
+}
+
+#else
+
+/**
+ * @brief In a forked child that cannot become the program: say why on @p status, then end.
+ *
+ * @param status The write end of the pipe a successful exec closes.
+ */
+[[noreturn]] void failStart(int status) {
+    const int error = errno;
+    // Nothing is left to tell if even this fails.
+    const ssize_t told = write(status, &error, sizeof(error));
+    static_cast<void>(told);
+    _exit(127);
 }
 
 #endif
@@ -200,6 +216,14 @@ bool ChildProcess::start(
         m_output = "could not open a pipe to the program\n";
         return false;
     }
+    // Closed by the exec that starts the program; one that fails writes its errno first.
+    int status[2];
+    if (pipe2(status, O_CLOEXEC) != 0) {
+        close(fds[0]);
+        close(fds[1]);
+        m_output = "could not open a pipe to the program\n";
+        return false;
+    }
 
     const pid_t parent = getpid();
     const pid_t pid = fork();
@@ -213,18 +237,36 @@ bool ChildProcess::start(
 #endif
         dup2(fds[1], STDOUT_FILENO);
         dup2(fds[1], STDERR_FILENO);
-        if (!dir.empty() && chdir(dir.c_str()) != 0) _exit(127);
+        if (!dir.empty() && chdir(dir.c_str()) != 0) failStart(status[1]);
         execv(path.c_str(), argv.data());
-        _exit(127);
+        failStart(status[1]);
     }
     close(fds[1]);
+    close(status[1]);
     if (pid < 0) {
         close(fds[0]);
+        close(status[0]);
         m_output = "could not start " + path + "\n";
         return false;
     }
     // Said by both sides: a stop() before the child runs must still find its group.
     setpgid(pid, pid);
+
+    // Nothing to read once the program has started; an errno when it could not.
+    int     error = 0;
+    ssize_t told  = 0;
+    do {
+        told = read(status[0], &error, sizeof(error));
+    } while (told < 0 && errno == EINTR);
+    close(status[0]);
+    if (told == static_cast<ssize_t>(sizeof(error))) {
+        int ended = 0;
+        while (waitpid(pid, &ended, 0) < 0 && errno == EINTR) {}
+        close(fds[0]);
+        const std::string where = dir.empty() ? path : path + " in " + dir;
+        m_output = "could not start " + where + ": " + std::strerror(error) + "\n";
+        return false;
+    }
 
     m_pid     = pid;
     m_pipeFd  = fds[0];
