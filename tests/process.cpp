@@ -251,6 +251,21 @@ TEST("a child program runs in the folder it is given, each argument whole") {
 #endif
 }
 
+TEST("a child program's input is empty, never this process's") {
+#if defined(_WIN32)
+    Vkm::Test::skip("the program run here is the POSIX shell");
+#else
+    // This process's input never ends, as a terminal's does not.
+    int input[2];
+    REQUIRE(::pipe(input) == 0);
+    REQUIRE(::dup2(input[0], STDIN_FILENO) == STDIN_FILENO);
+    ChildProcess child;
+    REQUIRE(child.start("/bin/sh", {"-c", "if read line; then echo read; else echo ended; fi"}));
+    CHECK(runToExit(child) == "ended\n");
+    CHECK(!child.running());
+#endif
+}
+
 TEST("a batch file gets each argument whole, or does not start") {
 #if !defined(_WIN32)
     Vkm::Test::skip("a batch file is Windows'");

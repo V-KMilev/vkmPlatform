@@ -298,6 +298,11 @@ bool ChildProcess::start(
         prctl(PR_SET_PDEATHSIG, SIGTERM);
         if (getppid() != parent) _exit(127);
 #endif
+        // No input, as on Windows: this process's may be a terminal, which stops a reader of another
+        // group, or a pipe that never ends.
+        const int nothing = open("/dev/null", O_RDONLY | O_CLOEXEC);
+        if (nothing < 0) failStart(status[1]);
+        dup2(nothing, STDIN_FILENO);
         dup2(fds[1], STDOUT_FILENO);
         dup2(fds[1], STDERR_FILENO);
         if (!dir.empty() && chdir(dir.c_str()) != 0) failStart(status[1]);
