@@ -161,6 +161,32 @@ TEST("stop ends what a child started that outlives its asking, though the progra
 #endif
 }
 
+TEST("stop ends what a program started, though the program had exited by itself") {
+#if defined(_WIN32)
+    Vkm::Test::skip("the program run here is the POSIX shell");
+#else
+    ChildProcess child;
+    const fs::path started   = scratch() / "started";
+    const std::string script = "sleep 60 & echo $! > \"$0\"";
+    REQUIRE(child.start("/bin/sh", {"-c", script, started.string()}));
+    runToExit(child);
+    REQUIRE(!child.running());
+    const pid_t below = static_cast<pid_t>(std::atoi(Vkm::Test::readText(started).c_str()));
+    REQUIRE(below > 0);
+    // Asked, sleep ends at once: ended two seconds on instead, it was never asked.
+    const auto before = std::chrono::steady_clock::now();
+    child.stop();
+    CHECK(std::chrono::steady_clock::now() - before < std::chrono::seconds(1));
+    CHECK(child.exitCode() == 0);
+    bool gone = false;
+    for (int i = 0; i < 5000 && !(gone = ::kill(below, 0) != 0); ++i) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    CHECK(gone);
+    if (!gone) ::kill(below, SIGKILL);
+#endif
+}
+
 TEST("stop asks a program that asks whether it should stop before it ends it, and ends one that never asks at once") {
     // The listener (fixture/listener.cpp) says when it has started and when it is asked.
     const fs::path listener = Vkm::Platform::executableDir() / VKM_TEST_LISTENER;

@@ -9,6 +9,7 @@
     #include <cerrno>
     #include <csignal>
     #include <cstring>
+    #include <optional>
     #include <fcntl.h>
     #include <poll.h>
     #include <sys/wait.h>
@@ -61,6 +62,26 @@ std::wstring quoted(const std::wstring& arg) {
     const ssize_t told = write(status, &error, sizeof(error));
     static_cast<void>(told);
     _exit(127);
+}
+
+/**
+ * @brief How @p pid, a child of this process, exited, leaving it unreaped.
+ *
+ * @param pid The child.
+ * @param options WNOHANG to answer at once, or 0 to wait for it to exit.
+ * @return Nothing while it runs; once it has exited, its exit code, or -1 when a signal ended it or
+ *         it can no longer be asked after.
+ */
+std::optional<int> exitOf(pid_t pid, int options) {
+    siginfo_t info{};
+    int       asked = 0;
+    do {
+        info.si_pid = 0;
+        asked       = waitid(P_PID, static_cast<id_t>(pid), &info, WEXITED | WNOWAIT | options);
+    } while (asked < 0 && errno == EINTR);
+    if (asked < 0) return -1;
+    if (info.si_pid != pid) return std::nullopt;
+    return info.si_code == CLD_EXITED ? info.si_status : -1;
 }
 
 #endif
@@ -302,15 +323,14 @@ bool ChildProcess::start(
 
 void ChildProcess::readUntilExit() {
     // The pipe ends when every holder closes it, which a daemon the program left behind never
-    // does: so the program is asked after between reads, and once it is reaped, what is left in
-    // the pipe is read and the rest is not its output.
+    // does: so the program is asked after between reads, and once it has exited, what is left in
+    // the pipe is read and the rest is not its output. It is left for stop() to reap.
     constexpr int ASK_MS = 50;
     char buffer[4096];
-    int  status = 0;
-    bool reaped = false;
+    std::optional<int> code;
     for (;;) {
         pollfd waiting{m_pipeFd, POLLIN, 0};
-        const int ready = poll(&waiting, 1, reaped ? 0 : ASK_MS);
+        const int ready = poll(&waiting, 1, code ? 0 : ASK_MS);
         if (ready < 0 && errno == EINTR) continue;
         if (ready > 0) {
             const ssize_t got = read(m_pipeFd, buffer, sizeof(buffer));
@@ -322,36 +342,35 @@ void ChildProcess::readUntilExit() {
             if (got < 0 && errno == EINTR) continue;
             break;
         }
-        if (ready < 0 || reaped) break;
-        const pid_t asked = waitpid(m_pid, &status, WNOHANG);
-        if (asked == m_pid) reaped = true;
-        if (asked < 0 && errno != EINTR) {
-            reaped = true;
-            status = -1;
-        }
+        if (ready < 0 || code) break;
+        code = exitOf(m_pid, WNOHANG);
     }
-    while (!reaped && waitpid(m_pid, &status, 0) < 0 && errno == EINTR) {}
+    if (!code) code = exitOf(m_pid, 0);
 
     std::lock_guard<std::mutex> lock(m_mutex);
-    m_exitCode = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+    m_exitCode = *code;
     m_running  = false;
 }
 
 void ChildProcess::stop() {
     if (!m_reader.joinable()) return;
     const bool ending = running();
-    if (ending) {
-        // Asked first; whatever of its group still runs two seconds on is ended, the program or what
-        // it started. Watched from while the program runs, so the group's id names nothing else.
-        kill(-m_pid, SIGTERM);
-        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
-        bool held = true;
-        while ((held = kill(-m_pid, 0) == 0) && std::chrono::steady_clock::now() < deadline) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(20));
-        }
-        if (held) kill(-m_pid, SIGKILL);
+    // Asked first, though the program may have exited, as what it started may not have; whatever of
+    // its group still runs two seconds on is ended. The program is reaped here alone: until then the
+    // group's id is its own, and after, what is left of the group holds it.
+    kill(-m_pid, SIGTERM);
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+    bool reaped = false;
+    bool held   = true;
+    for (;;) {
+        reaped = reaped || waitpid(m_pid, nullptr, WNOHANG) != 0;
+        held   = !reaped || kill(-m_pid, 0) == 0;
+        if (!held || std::chrono::steady_clock::now() >= deadline) break;
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
     }
+    if (held) kill(-m_pid, SIGKILL);
     m_reader.join();
+    while (!reaped && waitpid(m_pid, nullptr, 0) < 0 && errno == EINTR) {}
     if (ending) {
         std::lock_guard<std::mutex> lock(m_mutex);
         m_exitCode = -1;

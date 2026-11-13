@@ -93,12 +93,13 @@ threw is skipped. The caller's own chunk's throw goes before a queued one's, whi
 
 **A child process** writes its standard output and error into one pipe, read on a thread of its
 own, so a caller polls `takeOutput()` from its frame. It runs in a group of its own on Linux and a
-job on Windows, so `stop()` ends it and everything it started. It is asked first - SIGTERM on Linux,
-on Windows the event `stopRequested()` opens - and ended two seconds on; on Windows one that never
-asked has no event, and is ended at once. On Linux the reader asks after the program between reads,
-as a daemon the program left behind holds the pipe open forever. A batch file runs through cmd.exe, which reads its
-line again and acts on `&`, `|` or `=` outside quotes: so there every argument is quoted, and one
-holding what quotes leave to cmd.exe - a quote, a `%`, a line break - is refused rather than run.
+job on Windows, so `stop()` ends it and everything it started; on Linux it is asked first, and
+ended two seconds on. On Linux the reader asks after the program between reads, as a daemon the
+program left behind holds the pipe open forever, and leaves it unreaped: its id is its group's, so
+`stop()`, which reaps it, reaches the group however long after the program exited, and nothing
+else. A batch file runs through cmd.exe, which reads its line again and acts on `&`, `|` or `=`
+outside quotes: so there every argument is quoted, and one holding what quotes leave to cmd.exe -
+a quote, a `%`, a line break - is refused rather than run.
 
 **A dynamic library loaded through a copy** (`loadCopy`) leaves the original free to be rebuilt:
 Windows locks a loaded library against writes. The copy is `<stem>.loaded.<n><extension>` beside

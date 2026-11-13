@@ -80,9 +80,9 @@ class ChildProcess {
         /**
          * @brief Collects the output until the program exits, then keeps its exit code.
          *
-         * On Linux it asks after the program between reads and, once it is reaped, reads what is
-         * left in the pipe. On Windows it reads until every holder of the pipe has closed it, then
-         * waits for the program.
+         * On Linux it asks after the program between reads, leaving it for stop() to reap, and once
+         * it has exited reads what is left in the pipe. On Windows it reads until every holder of the
+         * pipe has closed it, then waits for the program.
          */
         void readUntilExit();
 
@@ -99,7 +99,7 @@ class ChildProcess {
         void*         m_job     = nullptr;  ///< Holds the program and all it starts, so stop() ends them together
         void*         m_pipe    = nullptr;
 #else
-        int m_pid    = 0;   ///< Also its process group's id, which holds all it starts
+        int m_pid    = 0;   ///< Also its group's id, which holds all it starts; stop() alone reaps it
         int m_pipeFd = -1;
 #endif
 };
