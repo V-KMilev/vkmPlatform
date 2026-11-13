@@ -79,7 +79,8 @@ thread that calls `parallelFor` runs a chunk too, and the process's other thread
   throw is caught and logged by the worker, as nobody waits on it.
 - **`shutdown()` joins the workers before `main` returns.** The static's destructor would run after
   what the tasks write into, and on Windows inside a library's unload, where a join hangs. Queued
-  work is dropped but still retires, so no waiter blocks, and `parallelFor` runs serially after.
+  background tasks are dropped. A batch is left to its waiter, which claims indices too, so every
+  index still runs and `parallelFor` runs serially after.
 
 `parallelFor(count, function)` runs a small range on the caller and cuts a larger one into several
 chunks per thread, so a thread the system preempts leaves its share to the others rather than

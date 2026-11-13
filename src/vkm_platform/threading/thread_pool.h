@@ -104,7 +104,7 @@ class ThreadPool {
         /**
          * @brief Queue indices [0, @p count) of @p batch as one entry and wake all workers.
          *
-         * Refused after shutdown() with the counter left at zero, so waitForBatch() returns.
+         * Taken after shutdown() too, when waitForBatch() runs every index itself.
          *
          * @param batch The batch to run; it and its task must outlive waitForBatch(), and the run
          *        it queued last must have been waited for.
@@ -125,8 +125,9 @@ class ThreadPool {
         /**
          * @brief Join the workers now, ahead of the pool's own destruction.
          *
-         * Started tasks finish; queued ones are dropped but still retire, so no waiter blocks.
-         * Call it as the main loop exits; after it, parallelFor runs serially.
+         * Started tasks finish and queued background tasks are dropped. A batch is left to its
+         * waiter, which runs every index no worker claimed, so after it parallelFor runs serially.
+         * Call it as the main loop exits.
          * Call before main returns: the static's destructor runs after the singletons tasks write
          * into, and on Windows inside DLL unload, where a join hangs. Idempotent.
          */
@@ -224,12 +225,6 @@ void parallelFor(size_t count, size_t grain, Function&& function) {
     }
 
     auto& pool = ThreadPool::get();
-
-    // No workers after shutdown(): a submission would never retire.
-    if (pool.threadCount() == 0) {
-        for (size_t i = 0; i < count; ++i) function(i);
-        return;
-    }
 
     // Chunk 0 is the caller's; batch index i is chunk i + 1.
     const size_t chunks = (count - 1) / grain + 1;

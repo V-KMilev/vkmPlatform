@@ -196,14 +196,63 @@ TEST("a background task's throw is caught and logged by its worker, which goes o
     }));
 }
 
-TEST("after shutdown, parallelFor runs on its caller and a background task is refused") {
+TEST("parallelFor on a thread of its own runs every index, though the pool shuts down as it runs") {
+    ThreadPool& pool = poolWithWorkers();
+
+    // Every worker held until shutdown() has begun, so none claims an index on its way out.
+    std::atomic<size_t> held{0};
+    std::atomic<bool>   release{false};
+    for (size_t i = 0; i < pool.threadCount(); ++i) {
+        pool.addTask([&] {
+            held.fetch_add(1);
+            within([&] { return release.load(); });
+        });
+    }
+    REQUIRE(within([&] { return held.load() == pool.threadCount(); }));
+
+    std::atomic<bool> inChunk{false};
+    std::atomic<bool> stopped{false};
+    std::atomic<int>  ran{0};
+    std::thread       caller([&] {
+        parallelFor(1000, 1, [&](size_t i) {
+            // Index 0 is the caller's own chunk, which spans the shutdown.
+            if (i == 0) {
+                inChunk = true;
+                within([&] { return stopped.load(); });
+            }
+            ran.fetch_add(1);
+        });
+    });
+    CHECK(within([&] { return inChunk.load(); }));
+
+    std::thread stopper([&] { pool.shutdown(); });
+    // shutdown() has begun once a task is refused.
+    CHECK(within([&] {
+        pool.addTask([] {});
+        return Vkm::Test::logText().find("addTask after shutdown") != std::string::npos;
+    }));
+    release = true;
+    stopper.join();
+    stopped = true;
+    caller.join();
+    CHECK(ran.load() == 1000);
+}
+
+TEST("after shutdown, parallelFor and a batch run on their caller and a background task is refused") {
     ThreadPool& pool = ThreadPool::get();
     pool.shutdown();
     pool.shutdown();
     CHECK(pool.threadCount() == 0u);
 
     std::vector<std::thread::id> threads;
-    parallelFor(300, 1, [&](size_t) { threads.push_back(std::this_thread::get_id()); });
+    const auto note = [&](size_t) { threads.push_back(std::this_thread::get_id()); };
+    parallelFor(300, 1, note);
+    CHECK(threads == std::vector<std::thread::id>(300, std::this_thread::get_id()));
+
+    threads.clear();
+    ThreadPool::Batch batch(note);
+    pool.addBatch(batch, 300);
+    pool.waitForBatch(batch);
     CHECK(threads == std::vector<std::thread::id>(300, std::this_thread::get_id()));
 
     std::atomic<bool> ran{false};

@@ -129,10 +129,6 @@ void ThreadPool::addBatch(Batch& batch, size_t count) {
     if (count == 0) return;
     {
         std::lock_guard<std::mutex> lock(m_tasksMutex);
-        if (!m_running) {
-            LOG_WARNING("ThreadPool::addBatch after shutdown; the batch is dropped");
-            return;
-        }
         // Queued again while running, its counters would reset under workers still claiming from it.
         VKM_ASSERT(batch.m_pending == 0, "a batch queued again before it was waited for");
         if (batch.m_pending != 0) {
@@ -190,15 +186,9 @@ void ThreadPool::shutdown() {
 
     m_threads.clear();
 
-    // Retired before dropped: otherwise a waiting caller's counter never reaches zero.
-    {
-        std::lock_guard<std::mutex> lock(m_tasksMutex);
-        // A batch's one entry stands for every index not yet claimed.
-        for (Batch* batch : m_batches) batch->m_pending -= batch->m_count - batch->m_claimed;
-        m_batches.clear();
-        m_backgroundTasks.clear();
-    }
-    m_doneCV.notify_all();
+    // A batch stays: its waiter runs every index no worker claimed.
+    std::lock_guard<std::mutex> lock(m_tasksMutex);
+    m_backgroundTasks.clear();
 }
 
 void ThreadPool::process() {
