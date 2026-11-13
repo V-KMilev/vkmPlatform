@@ -1,3 +1,5 @@
+#define VKM_LOG_CATEGORY "PLATFORM"
+
 #include "vkm_platform/process/this_process.h"
 
 #include <atomic>
@@ -5,6 +7,9 @@
 #include <cstdio>
 #include <cstdlib>
 
+#include "vkm_log/logger.h"
+
+#include "vkm_platform/process/stop_event.h"
 #include "vkm_platform/windows_api.h"
 
 #if !defined(_WIN32)
@@ -20,6 +25,21 @@ namespace {
 std::atomic<bool> g_stopRequested{false};
 
 extern "C" void onStopSignal(int) { g_stopRequested.store(true, std::memory_order_relaxed); }
+
+#if defined(_WIN32)
+// Ctrl+C, Ctrl+Break and the console closing, on a thread the system starts. A close ends the
+// process when the handler returns, so that one holds until the process leaves on its own, or
+// the system's few seconds run out.
+BOOL WINAPI onConsoleEvent(DWORD event) {
+    if (event != CTRL_C_EVENT && event != CTRL_BREAK_EVENT && event != CTRL_CLOSE_EVENT) return FALSE;
+    g_stopRequested.store(true, std::memory_order_relaxed);
+    if (event == CTRL_CLOSE_EVENT) Sleep(INFINITE);
+    return TRUE;
+}
+
+// The stop event set (ChildProcess::stop), on a thread of the system's pool.
+void CALLBACK onStopEvent(void*, BOOLEAN) { g_stopRequested.store(true, std::memory_order_relaxed); }
+#endif
 
 // An environment variable as a path, or empty when unset or blank. Wide on Windows: the narrow
 // environment mangles a non-ANSI user name.
@@ -93,6 +113,21 @@ bool stopRequested() {
     static const bool s_listening = [] {
         std::signal(SIGINT, onStopSignal);
         std::signal(SIGTERM, onStopSignal);
+#if defined(_WIN32)
+        SetConsoleCtrlHandler(onConsoleEvent, TRUE);
+        // Open as long as the process runs: its name is how a parent finds it.
+        const std::wstring name = Detail::stopEventName(GetCurrentProcessId());
+        const HANDLE stop = CreateEventW(nullptr, TRUE, FALSE, name.c_str());
+        HANDLE wait = nullptr;
+        const bool heard = stop != nullptr
+            && RegisterWaitForSingleObject(&wait, stop, onStopEvent, nullptr, INFINITE, WT_EXECUTEONLYONCE);
+        if (!heard) {
+            LOG_WARNING(
+                "Cannot hear ChildProcess::stop (error %lu): it will end this process without asking",
+                GetLastError()
+            );
+        }
+#endif
         return true;
     }();
     static_cast<void>(s_listening);

@@ -17,6 +17,7 @@ target_compile_definitions(vkm_platform_tests PRIVATE
     VKM_TEST_SUITE="vkm_platform"
     VKM_TEST_LOG
     VKM_TEST_MODULE="$<TARGET_FILE_NAME:vkm_platform_test_module>"
+    VKM_TEST_LISTENER="$<TARGET_FILE_NAME:vkm_platform_test_listener>"
     VKM_TEST_EXECUTABLE="$<TARGET_FILE_NAME:vkm_platform_tests>"
     VKM_TEST_ASSERTS_FLAG=$<BOOL:${VKM_PLATFORM_ASSERTS}>
 )
@@ -36,6 +37,11 @@ if(WIN32)
     set_target_properties(vkm_platform_test_module PROPERTIES PREFIX "")
 endif()
 add_dependencies(vkm_platform_tests vkm_platform_test_module)
+
+# A program the suite starts and stops, beside the suite: there it finds the libraries the suite does.
+add_executable(vkm_platform_test_listener ${CMAKE_CURRENT_SOURCE_DIR}/fixture/listener.cpp)
+target_link_libraries(vkm_platform_test_listener PRIVATE ${PROJECT_NAME})
+add_dependencies(vkm_platform_tests vkm_platform_test_listener)
 
 # Every public header with the library's include path alone: the suite does not build when one
 # reaches GLFW's.

@@ -12,8 +12,8 @@ namespace Vkm::Platform {
  * @brief A program run in the background, its output collected as it arrives.
  *
  * Standard output and error share one pipe, read on a thread of the process's own, so
- * a caller polls takeOutput() and running() from its frame. stop() ends the program and
- * everything it started - its children included - so nothing outlives it. Should
+ * a caller polls takeOutput() and running() from its frame. stop() asks the program to stop, then
+ * ends it and everything it started - its children included - so nothing outlives it. Should
  * this process die without stopping it, the program is ended too: on Windows with all it
  * started, its job's; on Linux it alone is sent SIGTERM, and what it started is its own to
  * end. Linux sends it when the thread that started the program ends, so start one from a
@@ -46,7 +46,11 @@ class ChildProcess {
         );
 
         /**
-         * @brief End the program and everything it started, and wait for it.
+         * @brief Ask the program to stop, then end it and everything it started, and wait for it.
+         *
+         * The asking is SIGTERM to its process group on POSIX, and on Windows the event a program
+         * that calls stopRequested() holds; there one that never called it is ended at once. What
+         * is left two seconds on is ended.
          */
         void stop();
 
@@ -89,9 +93,10 @@ class ChildProcess {
         std::thread        m_reader;
 
 #if defined(_WIN32)
-        void* m_process = nullptr;
-        void* m_job     = nullptr;  ///< Holds the program and all it starts, so stop() ends them together
-        void* m_pipe    = nullptr;
+        void*         m_process = nullptr;
+        unsigned long m_pid     = 0;        ///< Names its stop event (stopRequested)
+        void*         m_job     = nullptr;  ///< Holds the program and all it starts, so stop() ends them together
+        void*         m_pipe    = nullptr;
 #else
         int m_pid    = 0;   ///< Also its process group's id, which holds all it starts
         int m_pipeFd = -1;

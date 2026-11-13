@@ -92,9 +92,10 @@ threw is skipped.
 
 **A child process** writes its standard output and error into one pipe, read on a thread of its
 own, so a caller polls `takeOutput()` from its frame. It runs in a group of its own on Linux and a
-job on Windows, so `stop()` ends it and everything it started; on Linux it is asked first, and
-ended two seconds on. On Linux the reader asks after the program between reads, as a daemon the
-program left behind holds the pipe open forever.
+job on Windows, so `stop()` ends it and everything it started. It is asked first - SIGTERM on Linux,
+on Windows the event `stopRequested()` opens - and ended two seconds on; on Windows one that never
+asked has no event, and is ended at once. On Linux the reader asks after the program between reads,
+as a daemon the program left behind holds the pipe open forever.
 
 **A dynamic library loaded through a copy** (`loadCopy`) leaves the original free to be rebuilt:
 Windows locks a loaded library against writes. The copy is `<stem>.loaded.<n><extension>` beside
@@ -118,9 +119,12 @@ however it ends, so a crash leaves none behind. The file is not inherited by a c
 read from the environment on each call (`%APPDATA%` and `%LOCALAPPDATA%`; `$XDG_CONFIG_HOME` and
 `$XDG_STATE_HOME`, else under `$HOME`), wide on Windows, where the narrow environment mangles a
 non-ANSI user name. `attachParentConsole` lets a Windows GUI executable print to the console it was
-started from. `stopRequested()` installs handlers for SIGINT and SIGTERM on its first call; each sets
-one lock-free flag and does nothing else, so a program leaves through its normal exit and a process
-that never asks keeps the system's default.
+started from. `stopRequested()` installs handlers on its first call: for SIGINT and SIGTERM, and on
+Windows for Ctrl+C, Ctrl+Break and the console closing; there, in place of SIGTERM, it also opens an
+event named for the process, for `ChildProcess::stop` to set. Each of them sets one lock-free flag,
+so a program leaves through its normal exit, and a process that never asks keeps the system's
+default. A console closing ends the process once its handler returns, so that handler holds until
+the process leaves, or the system's few seconds run out.
 
 **The discrete GPU.** On a laptop with two GPUs, NVIDIA's and AMD's drivers read an export of the
 executable, never of a library, to pick the discrete one: `VKM_PLATFORM_PREFER_DISCRETE_GPU()`,

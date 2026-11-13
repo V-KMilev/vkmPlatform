@@ -41,14 +41,21 @@ std::filesystem::path userStateDir();
 void attachParentConsole();
 
 /**
- * @brief Whether the system has asked this process to stop: SIGINT (Ctrl+C) or SIGTERM since the
- *        first call.
+ * @brief Whether the system has asked this process to stop since the first call: SIGINT (Ctrl+C) or
+ *        SIGTERM; on Windows Ctrl+C, Ctrl+Break, its console closing, or ChildProcess::stop.
  *
- * The first call installs the handlers, and from then on neither signal ends the process: it is the
+ * The first call installs the handlers, and from then on none of these ends the process: it is the
  * caller's to ask each frame and leave through its normal exit. A process that never asks keeps the
- * system's default, which ends it. The handlers set one lock-free flag and touch nothing else.
+ * system's default, which ends it. Each handler sets one lock-free flag; the one for a Windows
+ * console closing then holds, as the process ends once it returns, until the process leaves or the
+ * system's few seconds run out.
  *
- * @return True once either signal has arrived.
+ * Windows has no SIGTERM: in its place the first call opens an event named for the process, which
+ * ChildProcess::stop sets; one that will not open is logged. Its name is in the session's own
+ * namespace, so what can ask is what SIGTERM lets on POSIX: the user's own processes, and no other
+ * session's.
+ *
+ * @return True once any of them has asked.
  */
 bool stopRequested();
 

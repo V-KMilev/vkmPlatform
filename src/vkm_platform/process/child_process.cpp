@@ -2,6 +2,7 @@
 
 #include <chrono>
 
+#include "vkm_platform/process/stop_event.h"
 #include "vkm_platform/windows_api.h"
 
 #if !defined(_WIN32)
@@ -151,6 +152,7 @@ bool ChildProcess::start(
     CloseHandle(info.hThread);
 
     m_process = info.hProcess;
+    m_pid     = info.dwProcessId;
     m_job     = job;
     m_pipe    = readEnd;
     m_running = true;
@@ -177,7 +179,19 @@ void ChildProcess::readUntilExit() {
 void ChildProcess::stop() {
     if (!m_reader.joinable()) return;
     const bool ending = running();
-    if (ending) TerminateJobObject(static_cast<HANDLE>(m_job), 1);
+    if (ending) {
+        // Asked first, as SIGTERM asks on POSIX: a program that asks whether it should stop holds
+        // the event named for it, and is given two seconds to leave. Whatever of its job is left
+        // then is ended, and so is a program that never asked, at once. While the process handle
+        // is open, its id names no other process.
+        const std::wstring name = Detail::stopEventName(m_pid);
+        if (const HANDLE asked = OpenEventW(EVENT_MODIFY_STATE, FALSE, name.c_str())) {
+            SetEvent(asked);
+            CloseHandle(asked);
+            WaitForSingleObject(static_cast<HANDLE>(m_process), 2000);
+        }
+        TerminateJobObject(static_cast<HANDLE>(m_job), 1);
+    }
     m_reader.join();
     if (ending) {
         std::lock_guard<std::mutex> lock(m_mutex);
@@ -187,6 +201,7 @@ void ChildProcess::stop() {
     CloseHandle(static_cast<HANDLE>(m_process));
     CloseHandle(static_cast<HANDLE>(m_job));
     m_pipe = m_process = m_job = nullptr;
+    m_pid  = 0;
 }
 
 #else

@@ -25,6 +25,7 @@
 #include "vkm_platform/process/discrete_gpu.h"
 #include "vkm_platform/process/dynamic_library.h"
 #include "vkm_platform/process/file_lock.h"
+#include "vkm_platform/process/stop_event.h"
 #include "vkm_platform/process/this_process.h"
 
 #include "harness/check.h"
@@ -69,6 +70,16 @@ std::vector<std::string> namesIn(const fs::path& folder) {
     }
     std::sort(names.begin(), names.end());
     return names;
+}
+
+/// What @p child's program wrote until it wrote @p text or ended, five seconds at most.
+std::string outputUntil(ChildProcess& child, const std::string& text) {
+    std::string output;
+    for (int i = 0; i < 5000 && child.running() && output.find(text) == std::string::npos; ++i) {
+        output += child.takeOutput();
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    return output + child.takeOutput();
 }
 
 #if !defined(_WIN32)
@@ -151,6 +162,30 @@ TEST("stop ends what a child started that outlives its asking, though the progra
     CHECK(gone);
     if (!gone) ::kill(below, SIGKILL);
 #endif
+}
+
+TEST("stop asks a program that asks whether it should stop before it ends it, and ends one that never asks at once") {
+    // The listener (fixture/listener.cpp) says when it has started and when it is asked.
+    const fs::path listener = Vkm::Platform::executableDir() / VKM_TEST_LISTENER;
+    ChildProcess child;
+    REQUIRE(child.start(listener, {}));
+    std::string output = outputUntil(child, "started");
+    REQUIRE(output.find("started") != std::string::npos);
+    auto before = std::chrono::steady_clock::now();
+    child.stop();
+    output += child.takeOutput();
+    CHECK(output.find("asked to stop") != std::string::npos);
+    // Asked, so it ended before stop's two seconds ran out.
+    CHECK(std::chrono::steady_clock::now() - before < std::chrono::seconds(2));
+    CHECK(!child.running());
+
+    REQUIRE(child.start(listener, {"deaf"}));
+    REQUIRE(outputUntil(child, "started").find("started") != std::string::npos);
+    before = std::chrono::steady_clock::now();
+    child.stop();
+    CHECK(std::chrono::steady_clock::now() - before < std::chrono::seconds(1));
+    CHECK(!child.running());
+    CHECK(child.takeOutput().find("asked to stop") == std::string::npos);
 }
 
 TEST("a child program runs in the folder it is given, each argument whole") {
@@ -407,6 +442,20 @@ TEST("a process that never asks keeps the system's default, and SIGINT ends it")
     REQUIRE(waitpid(child, &status, 0) == child);
     CHECK(WIFSIGNALED(status));
     CHECK(WTERMSIG(status) == SIGINT);
+#endif
+}
+
+TEST("a process that cannot hear a parent's stop says so") {
+#if defined(_WIN32)
+    // Its event's name taken by an object of another kind, so the event cannot be opened.
+    const std::wstring name = Vkm::Platform::Detail::stopEventName(GetCurrentProcessId());
+    const HANDLE taken = CreateMutexW(nullptr, FALSE, name.c_str());
+    REQUIRE(taken != nullptr);
+    CHECK(!Vkm::Platform::stopRequested());
+    CloseHandle(taken);
+    CHECK(Vkm::Test::logText().find("ChildProcess::stop") != std::string::npos);
+#else
+    Vkm::Test::skip("a parent's stop is SIGTERM here, which nothing keeps from a process");
 #endif
 }
 
