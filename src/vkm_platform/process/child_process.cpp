@@ -163,7 +163,8 @@ bool ChildProcess::start(
     HANDLE readEnd = nullptr;
     HANDLE writeEnd = nullptr;
     if (!CreatePipe(&readEnd, &writeEnd, &inherit, PIPE_BYTES)) {
-        m_output = "could not open a pipe to the program\n";
+        const std::string why = std::system_category().message(static_cast<int>(GetLastError()));
+        m_output = "could not open a pipe to the program: " + why + "\n";
         return false;
     }
     SetHandleInformation(readEnd, HANDLE_FLAG_INHERIT, 0);
@@ -314,20 +315,23 @@ bool ChildProcess::start(
 
     int fds[2];
     if (pipe2(fds, O_CLOEXEC) != 0) {
-        m_output = "could not open a pipe to the program\n";
+        const int error = errno;
+        m_output = std::string("could not open a pipe to the program: ") + std::strerror(error) + "\n";
         return false;
     }
     // Closed by the exec that starts the program; one that fails writes its errno first.
     int status[2];
     if (pipe2(status, O_CLOEXEC) != 0) {
+        const int error = errno;
         close(fds[0]);
         close(fds[1]);
-        m_output = "could not open a pipe to the program\n";
+        m_output = std::string("could not open a pipe to the program: ") + std::strerror(error) + "\n";
         return false;
     }
 
-    const pid_t parent = getpid();
-    const pid_t pid = fork();
+    const pid_t parent  = getpid();
+    const pid_t pid     = fork();
+    const int forkError = pid < 0 ? errno : 0;
     if (pid == 0) {
         // A group of its own, so stop() reaches everything it starts.
         setpgid(0, 0);
@@ -352,7 +356,7 @@ bool ChildProcess::start(
     if (pid < 0) {
         close(fds[0]);
         close(status[0]);
-        m_output = "could not start " + path + "\n";
+        m_output = "could not start " + path + ": " + std::strerror(forkError) + "\n";
         return false;
     }
     // Said by both sides: a stop() before the child runs must still find its group.

@@ -7,6 +7,7 @@
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <string>
 #include <system_error>
@@ -18,6 +19,7 @@
     #include "vkm_platform/windows_api.h"
 #else
     #include <signal.h>
+    #include <sys/resource.h>
     #include <sys/stat.h>
     #include <sys/wait.h>
     #include <unistd.h>
@@ -194,6 +196,25 @@ TEST("stop ends what a program started, though the program had exited by itself"
     }
     CHECK(gone);
     if (!gone) ::kill(below, SIGKILL);
+#endif
+}
+
+TEST("a program that cannot have its pipe does not start, and says why") {
+#if defined(_WIN32)
+    Vkm::Test::skip("a child process here needs fork");
+#else
+    const Vkm::Test::Ended ended = Vkm::Test::inChild([] {
+        // No descriptor left to open, so the first pipe fails.
+        const int lowest = dup(STDIN_FILENO);
+        close(lowest);
+        const rlimit none{static_cast<rlim_t>(lowest), static_cast<rlim_t>(lowest)};
+        setrlimit(RLIMIT_NOFILE, &none);
+        ChildProcess child;
+        const bool started = child.start("/bin/true", {});
+        const bool said    = child.takeOutput().find(std::strerror(EMFILE)) != std::string::npos;
+        if (started || !said) _exit(1);
+    });
+    CHECK(ended == Vkm::Test::Ended::Returned);
 #endif
 }
 
