@@ -101,6 +101,7 @@ class DynamicLibrary {
          */
         static std::string platformName(const std::string& baseName);
 
+        /// Whether a library is loaded: the original, or its copy for loadCopy.
         bool isLoaded() const { return m_handle != nullptr; }
 
     private:

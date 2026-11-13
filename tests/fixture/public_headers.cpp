@@ -1,6 +1,6 @@
 // Every public header, compiled with no include path but the library's own and vkmLog's: a header
-// that reached GLFW's would not compile here. glfw_api.h is GLFW's door, for a file that links it, and
-// windows_api.h the library's own.
+// that reached GLFW's would not compile here. glfw_api.h is GLFW's door, for a file that links it;
+// windows_api.h, profile.h and process/stop_event.h are the library's own.
 
 #include "vkm_platform/input/input_handle.h"
 #include "vkm_platform/input/key.h"

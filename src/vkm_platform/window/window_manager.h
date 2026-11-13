@@ -132,7 +132,7 @@ class WindowManager {
         /**
          * @brief Update the window title.
          *
-         * @param title The new title; kept even with no window.
+         * @param title The new title; kept with no window, until createWindow names the window.
          */
         void setTitle(const std::string& title);
 
@@ -143,6 +143,8 @@ class WindowManager {
 
         /**
          * @brief Changes the current window mode (fullscreen or windowed).
+         *
+         * A no-op before createWindow(), which opens the window windowed.
          *
          * @param windowMode The desired window mode.
          */
@@ -181,6 +183,8 @@ class WindowManager {
 
         /**
          * @brief Enables or disables vertical synchronization (VSync).
+         *
+         * A no-op before createWindow(), which leaves it off until this is called.
          *
          * @param enabled True to enable VSync, false to disable.
          */

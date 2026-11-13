@@ -73,7 +73,8 @@ class ChildProcess {
         /**
          * @brief How the last program exited.
          *
-         * @return Its exit code; -1 while it runs, when none started, or when it was stopped.
+         * @return Its exit code; -1 while it runs, when none started, or when it was stopped, and on
+         *         POSIX when a signal ended it. On Windows a crash reports its exception code.
          */
         int exitCode() const;
 

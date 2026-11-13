@@ -15,13 +15,14 @@ the frame cap still paces `swapBuffers`, its reporters answer zero (`framebuffer
 close request is a field of its own rather than GLFW's, so a program with no window still runs its
 frames and can still be told to end.
 
-**Input arrives by callback, inside `updateInput()`'s poll**, on the main thread. A callback writes
-into the `InputHandle`; the pointer's position is kept by callback and handed over once a frame,
-so its step is the frame's movement. Leaving the window reports no position, so the last one
-inside is asked for on the way out. Entering and leaving `CursorMode::Disabled` moves the cursor,
-which is no movement of the user's: the handle is told where it went without a step (`warpTo`).
-`setCursorFree` shows the cursor over whatever mode was set and puts the mode back once freed no
-longer, so a menu can take the pointer without forgetting the game's.
+**Input arrives by callback, inside `updateInput()`'s poll or `pumpEvents()`'s**, on the main
+thread. A callback writes into the `InputHandle`; the pointer's position is kept by callback and
+handed over once a frame, so its step is the frame's movement. Leaving the window reports no
+position, so the last one inside is asked for on the way out. Entering and leaving
+`CursorMode::Disabled` moves the cursor, which is no movement of the user's: the handle is told
+where it went without a step (`warpTo`). `setCursorFree` shows the cursor over whatever mode was set
+and puts the mode back once freed no longer, so a menu can take the pointer without forgetting the
+game's.
 
 The framebuffer's size and the window's are kept by callback, not asked each frame: on X11 each
 question is a round trip to the server. The monitor a window is on is the one it overlaps most,
@@ -43,11 +44,12 @@ a name. A code no key has, as `GLFW_KEY_UNKNOWN`, is dropped there.
 
 `InputHandle` is one frame of keys, buttons, pointer, scroll and typed text, by the library's names
 and with no GLFW in it, so a program with no window, or a test, feeds it through the calls the
-window makes. One poll can carry a press and its release together, which the level alone would
-miss: so a key also records a **strike** (it went down since `clearStrikes`), a **restrike** (it was
-down at `clearStrikes`, and was let go and struck again since) and **typed** (it went down or
-repeated: a repeat is a press of a key already held). `clearStrikes` keeps what is held. Scroll
-adds up within a frame, as one frame can carry several notches, and is cleared before each poll.
+window makes. One poll can carry a press and its release together, which the level alone would miss:
+so a key also records a **strike** (it went down since `clearStrikes`), a **restrike** (it was down
+at `clearStrikes`, and was let go and struck again since) and **typed** (it went down or repeated: a
+repeat is a press of a key already held). `clearStrikes` keeps what is held. Scroll adds up within a
+frame, as one frame can carry several notches, and is cleared before `updateInput()`'s poll: what
+arrives in `pumpEvents()` is dropped, where a key struck there shows as a strike in the first frame.
 
 ## The frame limiter
 
