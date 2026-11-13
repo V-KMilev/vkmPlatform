@@ -2,12 +2,14 @@
 // and its stop.
 
 #include <algorithm>
+#include <cerrno>
 #include <chrono>
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <string>
+#include <system_error>
 #include <thread>
 #include <utility>
 #include <vector>
@@ -94,7 +96,7 @@ std::string runToExit(ChildProcess& child) {
 
 } // namespace
 
-TEST("a child program is heard, reports its exit code and can be stopped, and a missing program does not start") {
+TEST("a child program is heard, reports its exit code and can be stopped") {
 #if defined(_WIN32)
     Vkm::Test::skip("the program run here is the POSIX shell");
 #else
@@ -128,12 +130,20 @@ TEST("a child program is heard, reports its exit code and can be stopped, and a 
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
     CHECK(gone);
+#endif
+}
 
+TEST("a program that cannot start does not run, and says why as the system does") {
+#if defined(_WIN32)
+    const int notFound = ERROR_FILE_NOT_FOUND;
+#else
+    const int notFound = ENOENT;
+#endif
     ChildProcess missing;
     CHECK(!missing.start(scratch() / "no such program", {}));
     CHECK(!missing.running());
-    CHECK(!missing.takeOutput().empty());
-#endif
+    CHECK(missing.exitCode() == -1);
+    CHECK(missing.takeOutput().find(std::system_category().message(notFound)) != std::string::npos);
 }
 
 TEST("stop ends what a child started that outlives its asking, though the program itself ended at once") {

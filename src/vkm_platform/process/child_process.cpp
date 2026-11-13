@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <system_error>
 
 #include "vkm_platform/process/stop_event.h"
 #include "vkm_platform/windows_api.h"
@@ -155,15 +156,21 @@ bool ChildProcess::start(
     startup.hStdOutput = writeEnd;
     startup.hStdError  = writeEnd;
 
-    // Created suspended, so it is in the job before it can start anything of its own.
-    HANDLE job = CreateJobObjectW(nullptr, nullptr);
-    JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{};
-    limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-    SetInformationJobObject(job, JobObjectExtendedLimitInformation, &limits, sizeof(limits));
-
     PROCESS_INFORMATION info{};
     const std::wstring dir = workingDir.wstring();
-    const BOOL started = CreateProcessW(
+
+    // Created suspended, so it is in the job before it can start anything of its own; one the job
+    // does not hold is ended, as stop() could not reach what it starts.
+    JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{};
+    limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+    const HANDLE job     = CreateJobObjectW(nullptr, nullptr);
+    const bool   limited = job && SetInformationJobObject(
+        job,
+        JobObjectExtendedLimitInformation,
+        &limits,
+        sizeof(limits)
+    );
+    const bool   created = limited && CreateProcessW(
         nullptr,
         line.data(),
         nullptr,
@@ -175,17 +182,25 @@ bool ChildProcess::start(
         &startup,
         &info
     );
+    const bool  held    = created && AssignProcessToJobObject(job, info.hProcess);
+    const bool  resumed = held && ResumeThread(info.hThread) != static_cast<DWORD>(-1);
+    const DWORD error   = GetLastError();
     CloseHandle(writeEnd);
     if (nothing != INVALID_HANDLE_VALUE) CloseHandle(nothing);
-    if (!started) {
+    if (created) CloseHandle(info.hThread);
+    if (!resumed) {
+        if (created) {
+            TerminateProcess(info.hProcess, 1);
+            CloseHandle(info.hProcess);
+        }
         CloseHandle(readEnd);
-        CloseHandle(job);
-        m_output = "could not start " + program.string() + "\n";
+        if (job) CloseHandle(job);
+        const std::string path  = program.string();
+        const std::string where = dir.empty() ? path : path + " in " + workingDir.string();
+        const std::string why   = std::system_category().message(static_cast<int>(error));
+        m_output = "could not start " + where + ": " + why + "\n";
         return false;
     }
-    AssignProcessToJobObject(job, info.hProcess);
-    ResumeThread(info.hThread);
-    CloseHandle(info.hThread);
 
     m_process = info.hProcess;
     m_pid     = info.dwProcessId;
