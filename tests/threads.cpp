@@ -238,6 +238,28 @@ TEST("parallelFor on a thread of its own runs every index, though the pool shuts
     CHECK(ran.load() == 1000);
 }
 
+TEST("the worker count may be asked on one thread while another shuts the pool down, and falls to zero") {
+    ThreadPool&  pool    = poolWithWorkers();
+    const size_t workers = pool.threadCount();
+
+    std::atomic<bool> asking{false};
+    std::atomic<bool> stopped{false};
+    std::atomic<int>  wrong{0};
+    std::thread       asker([&] {
+        while (!stopped) {
+            const size_t count = pool.threadCount();
+            wrong += count != workers && count != 0;
+            asking = true;
+        }
+    });
+    CHECK(within([&] { return asking.load(); }));
+    pool.shutdown();
+    stopped = true;
+    asker.join();
+    CHECK(wrong.load() == 0);
+    CHECK(pool.threadCount() == 0u);
+}
+
 TEST("after shutdown, parallelFor and a batch run on their caller and a background task is refused") {
     ThreadPool& pool = ThreadPool::get();
     pool.shutdown();

@@ -184,8 +184,6 @@ void ThreadPool::shutdown() {
         }
     }
 
-    m_threads.clear();
-
     // A batch stays: its waiter runs every index no worker claimed.
     std::lock_guard<std::mutex> lock(m_tasksMutex);
     m_backgroundTasks.clear();

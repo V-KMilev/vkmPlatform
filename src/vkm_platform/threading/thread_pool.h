@@ -86,7 +86,7 @@ class ThreadPool {
          * @brief How many workers get() starts the pool with, from the CPUs the process may run on
          *        now: one fewer than their physical cores, and one at least.
          *
-         * @return The count.
+         * @return The count, one at least.
          */
         static size_t defaultThreadCount();
 
@@ -143,7 +143,12 @@ class ThreadPool {
          */
         static bool isWorkerThread();
 
-        size_t threadCount() const { return m_threads.size(); }
+        /**
+         * @brief The workers, on any thread; none once shutdown() has begun.
+         *
+         * @return How many workers run; 0 once shutdown() has begun.
+         */
+        size_t threadCount() const { return m_running ? m_threads.size() : 0; }
 
     private:
         /**
@@ -187,7 +192,7 @@ class ThreadPool {
     private:
         std::atomic<bool> m_running;
 
-        std::vector<std::thread> m_threads;
+        std::vector<std::thread> m_threads;  ///< Sized by the constructor alone, so read unlocked.
 
         std::vector<Batch*>    m_batches;          ///< From addBatch, an entry a batch until its last index
                                                    ///< is claimed; drained first. Kept, so a batch queued
