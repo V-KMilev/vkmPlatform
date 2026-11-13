@@ -49,7 +49,8 @@ so a key also records a **strike** (it went down since `clearStrikes`), a **rest
 at `clearStrikes`, and was let go and struck again since) and **typed** (it went down or repeated: a
 repeat is a press of a key already held). `clearStrikes` keeps what is held. Scroll adds up within a
 frame, as one frame can carry several notches, and is cleared before `updateInput()`'s poll: what
-arrives in `pumpEvents()` is dropped, where a key struck there shows as a strike in the first frame.
+arrives in `pumpEvents()` is dropped, where a key struck there shows as a strike in the first frame,
+and the pointer's movement there is no frame's step.
 
 ## The frame limiter
 

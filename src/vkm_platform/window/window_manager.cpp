@@ -214,10 +214,7 @@ void WindowManager::createWindow(const std::string& title, std::unique_ptr<Windo
         if (manager && !entered) glfwGetCursorPos(w, &manager->m_cursorX, &manager->m_cursorY);
     });
 
-    // Seeds the delta's origin, or the first updateInput() reports the whole distance to the
-    // pointer. updateInput overwrites the seed's own delta before anything reads it.
-    glfwGetCursorPos(m_windowHandle, &m_cursorX, &m_cursorY);
-    m_inputHandle.moveTo(m_cursorX, m_cursorY);
+    // Applying the cursor mode also seeds the delta's origin, with no step.
     applyCursor();
 
     LOG_INFO("Created window '%s' (%dx%d, refresh %dHz)", title.c_str(), m_width, m_height, getRefreshRate());
@@ -430,7 +427,10 @@ void WindowManager::updateInput() {
 }
 
 void WindowManager::pumpEvents() {
-    if (m_windowHandle) glfwPollEvents();
+    if (!m_windowHandle) return;
+    glfwPollEvents();
+    // The pointer's movement while pumping is no frame's: the next updateInput measures from here.
+    m_inputHandle.warpTo(m_cursorX, m_cursorY);
 }
 
 bool WindowManager::beginFrame() {
