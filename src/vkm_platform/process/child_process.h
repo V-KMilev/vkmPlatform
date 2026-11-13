@@ -35,7 +35,8 @@ class ChildProcess {
          * @brief Start @p program with @p args in @p workingDir, ending any program started before.
          *
          * @param program The executable, by path.
-         * @param args Its arguments, each passed as one argument.
+         * @param args Its arguments, each passed as one argument. A batch file's (.bat, .cmd) are read by
+         *             cmd.exe too, so one holding a quote, a % or a line break is refused.
          * @param workingDir Where it runs; empty keeps this process's.
          * @return Whether it started; a failure is in takeOutput().
          */

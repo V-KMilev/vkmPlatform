@@ -85,6 +85,33 @@ bool ChildProcess::start(
         m_exitCode = -1;
     }
 
+    // A batch file runs through cmd.exe, which reads the line again and acts on more than a space
+    // outside quotes: there every word is quoted as cmd.exe reads quotes, with no escapes, and one
+    // holding what quotes leave to cmd.exe is refused. /s strips the outer quotes and runs the rest
+    // as written; /v:off keeps a ! as written.
+    const std::wstring ext = program.extension().wstring();
+    const bool batch = _wcsicmp(ext.c_str(), L".cmd") == 0 || _wcsicmp(ext.c_str(), L".bat") == 0;
+    std::vector<std::wstring> words = {program.wstring()};
+    for (const std::string& arg : args) words.push_back(std::filesystem::path(arg).wstring());
+
+    std::wstring command;
+    for (const std::wstring& word : words) {
+        if (batch && word.find_first_of(L"\"%\r\n") != std::wstring::npos) {
+            const std::string what = std::filesystem::path(word).string();
+            const std::string why  = ": cmd.exe, which runs it, would act on the quote, % or line break in ";
+            m_output = "could not start " + program.string() + why + what + "\n";
+            return false;
+        }
+        command += (command.empty() ? L"" : L" ") + (batch ? L"\"" + word + L"\"" : quoted(word));
+    }
+    std::wstring line = command;
+    if (batch) {
+        wchar_t comspec[MAX_PATH];
+        const DWORD length = GetEnvironmentVariableW(L"ComSpec", comspec, MAX_PATH);
+        const std::wstring shell = length > 0 && length < MAX_PATH ? comspec : L"cmd.exe";
+        line = L"\"" + shell + L"\" /d /v:off /s /c \"" + command + L"\"";
+    }
+
     SECURITY_ATTRIBUTES inherit{sizeof(SECURITY_ATTRIBUTES), nullptr, TRUE};
     HANDLE readEnd = nullptr;
     HANDLE writeEnd = nullptr;
@@ -94,23 +121,6 @@ bool ChildProcess::start(
     }
     SetHandleInformation(readEnd, HANDLE_FLAG_INHERIT, 0);
     HANDLE nothing = CreateFileW(L"NUL", GENERIC_READ, FILE_SHARE_READ, &inherit, OPEN_EXISTING, 0, nullptr);
-
-    // A batch file runs through cmd.exe: /s strips the outer quotes and runs the rest as written.
-    std::wstring line;
-    const std::wstring ext = program.extension().wstring();
-    const bool batch = _wcsicmp(ext.c_str(), L".cmd") == 0 || _wcsicmp(ext.c_str(), L".bat") == 0;
-    std::wstring command = quoted(program.wstring());
-    for (const std::string& arg : args) {
-        command += L" " + quoted(std::filesystem::path(arg).wstring());
-    }
-    if (batch) {
-        wchar_t comspec[MAX_PATH];
-        const DWORD length = GetEnvironmentVariableW(L"ComSpec", comspec, MAX_PATH);
-        const std::wstring shell = length > 0 && length < MAX_PATH ? comspec : L"cmd.exe";
-        line = quoted(shell) + L" /d /s /c \"" + command + L"\"";
-    } else {
-        line = command;
-    }
 
     STARTUPINFOW startup{};
     startup.cb         = sizeof(startup);

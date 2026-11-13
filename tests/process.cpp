@@ -82,9 +82,7 @@ std::string outputUntil(ChildProcess& child, const std::string& text) {
     return output + child.takeOutput();
 }
 
-#if !defined(_WIN32)
-/// Run @p child's program until it exits, five seconds at most, collecting what it wrote. Only the POSIX tests start a
-/// program to hear, so a Windows build has no caller.
+/// Run @p child's program until it exits, five seconds at most, collecting what it wrote.
 std::string runToExit(ChildProcess& child) {
     std::string output;
     for (int i = 0; i < 5000 && child.running(); ++i) {
@@ -93,7 +91,6 @@ std::string runToExit(ChildProcess& child) {
     }
     return output + child.takeOutput();
 }
-#endif
 
 } // namespace
 
@@ -200,6 +197,34 @@ TEST("a child program runs in the folder it is given, each argument whole") {
     CHECK(output.find(fs::weakly_canonical(scratch() / "work").string() + "\n") != std::string::npos);
     CHECK(output.find("[two words][*]") != std::string::npos);
     CHECK(child.exitCode() == 0);
+#endif
+}
+
+TEST("a batch file gets each argument whole, or does not start") {
+#if !defined(_WIN32)
+    Vkm::Test::skip("a batch file is Windows'");
+#else
+    // cmd.exe runs a batch file and reads its line: & runs a command, = splits an argument, and a
+    // backslash escapes nothing.
+    const fs::path batch = scratch() / "R&D" / "args.bat";
+    Vkm::Test::writeText(batch, "@echo [%1] [%2] [%3] [%4]\r\n");
+    ChildProcess child;
+    REQUIRE(child.start(batch, {"Tom&echo.INJECTED", "two words", "x=y", "C:\\dir\\"}));
+    const std::string output = runToExit(child);
+    const std::string expected = "[\"Tom&echo.INJECTED\"] [\"two words\"] [\"x=y\"] [\"C:\\dir\\\"]";
+    CHECK(output.find(expected) != std::string::npos);
+    CHECK(child.exitCode() == 0);
+
+    // What quotes do not keep from it: a quote, a variable, a line break.
+    for (const std::string& refused : {"100%OS%", "say \"hi\"", "two\nlines"}) {
+        CHECK(!child.start(batch, {refused}));
+        CHECK(!child.running());
+        CHECK(child.takeOutput().find(refused) != std::string::npos);
+    }
+    const fs::path named = scratch() / "100%OS%" / "args.bat";
+    Vkm::Test::writeText(named, "@echo ran\r\n");
+    CHECK(!child.start(named, {}));
+    CHECK(child.takeOutput().find(named.string()) != std::string::npos);
 #endif
 }
 
