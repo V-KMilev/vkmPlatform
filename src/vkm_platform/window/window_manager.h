@@ -195,7 +195,8 @@ class WindowManager {
         /**
          * @brief Sets the cursor mode.
          *
-         * Kept even with no window, so cursorMode() answers what it was told.
+         * Kept even with no window, so cursorMode() answers what it was told, and applied when the
+         * window is created.
          *
          * @param mode The desired cursor mode.
          */

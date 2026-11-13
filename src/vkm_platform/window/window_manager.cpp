@@ -209,6 +209,7 @@ void WindowManager::createWindow(const std::string& title, std::unique_ptr<Windo
     // pointer. updateInput overwrites the seed's own delta before anything reads it.
     glfwGetCursorPos(m_windowHandle, &m_cursorX, &m_cursorY);
     m_inputHandle.moveTo(m_cursorX, m_cursorY);
+    applyCursor();
 
     LOG_INFO("Created window '%s' (%dx%d, refresh %dHz)", title.c_str(), m_width, m_height, getRefreshRate());
 }
