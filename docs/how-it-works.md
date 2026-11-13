@@ -75,8 +75,8 @@ thread that calls `parallelFor` runs a chunk too, and the process's other thread
   batch queue, so the tasks are not starved for long.
 - **A batch allocates nothing.** It borrows its task and stays one queue entry until its last index
   is claimed; the caller claims indices too while it waits, wherever the entry stands.
-- **An index that throws still retires**, and the first throw is rethrown to the waiter; a task's
-  throw is caught and logged by the worker, as nobody waits on it.
+- **An index that throws still retires**, and the first throw is rethrown to the waiter and any
+  later one logged; a task's throw is caught and logged by the worker, as nobody waits on it.
 - **`shutdown()` joins the workers before `main` returns.** The static's destructor would run after
   what the tasks write into, and on Windows inside a library's unload, where a join hangs. Queued
   background tasks are dropped. A batch is left to its waiter, which claims indices too, so every
@@ -87,7 +87,7 @@ chunks per thread, so a thread the system preempts leaves its share to the other
 stretching the join. Called from a worker it runs serially there: the other workers are busy, so
 nested chunks would only come back at a lock each. A throw reaches the caller after every other
 chunk has run, since the queued chunks reach into the caller's frame; the rest of the chunk that
-threw is skipped.
+threw is skipped. The caller's own chunk's throw goes before a queued one's, which is logged.
 
 ## Processes
 

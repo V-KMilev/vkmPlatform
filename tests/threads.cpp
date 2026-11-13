@@ -117,6 +117,35 @@ TEST("a throw in parallelFor reaches its caller once every other chunk has run")
     CHECK(after.load() == 4000);
 }
 
+TEST("a throw parallelFor does not rethrow, as another is rethrown, is logged") {
+    // The caller's own chunk and a queued one: the caller's propagates.
+    std::string caught;
+    try {
+        parallelFor(4000, 1, [&](size_t i) {
+            if (i == 0) throw std::runtime_error("the caller's");
+            if (i == 3001) throw std::runtime_error("index 3001");
+        });
+    } catch (const std::runtime_error& e) {
+        caught = e.what();
+    }
+    CHECK(caught == "the caller's");
+    CHECK(Vkm::Test::logText().find("index 3001") != std::string::npos);
+
+    // Two queued chunks: the first to throw propagates.
+    caught.clear();
+    try {
+        parallelFor(4000, 1, [&](size_t i) {
+            if (i == 1002) throw std::runtime_error("index 1002");
+            if (i == 2003) throw std::runtime_error("index 2003");
+        });
+    } catch (const std::runtime_error& e) {
+        caught = e.what();
+    }
+    const bool lowerFirst = caught == "index 1002";
+    CHECK((lowerFirst || caught == "index 2003"));
+    CHECK(Vkm::Test::logText().find(lowerFirst ? "index 2003" : "index 1002") != std::string::npos);
+}
+
 TEST("a batch is waited for alone: with every worker held by background tasks, its caller runs it whole") {
     ThreadPool& pool = poolWithWorkers();
     std::atomic<size_t> held{0};

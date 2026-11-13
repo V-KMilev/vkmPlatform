@@ -116,7 +116,8 @@ class ThreadPool {
          * @brief Block the caller until every index of @p batch has retired.
          *
          * The caller first runs every index no worker has claimed. An index that throws still
-         * retires; the first exception thrown is rethrown here, whichever thread ran it.
+         * retires; the first exception thrown is rethrown here, whichever thread ran it, and any
+         * later one is logged.
          *
          * @param batch The batch handed to addBatch.
          */
@@ -151,6 +152,10 @@ class ThreadPool {
         size_t threadCount() const { return m_running ? m_threads.size() : 0; }
 
     private:
+        template<class Function>
+        friend void parallelFor(size_t count, size_t grain, Function&& function);
+
+    private:
         /**
          * @brief One unit of work a worker takes: an owned task, or a claimed index of a Batch.
          */
@@ -165,6 +170,14 @@ class ThreadPool {
         ~ThreadPool();
 
         /**
+         * @brief waitForBatch for parallelFor once its caller's own chunk threw, the throw it
+         *        rethrows: the batch's throw is logged, not rethrown.
+         *
+         * @param batch The batch parallelFor queued.
+         */
+        void waitForBatchAfterThrow(Batch& batch);
+
+        /**
          * @brief Worker loop: pop and run tasks until shutdown.
          */
         void process();
@@ -172,7 +185,7 @@ class ThreadPool {
         /**
          * @brief Run one claimed index of @p batch and retire it, even when it throws.
          *
-         * The first throw is kept on the batch for waitForBatch to rethrow.
+         * The first throw is kept on the batch for waitForBatch to rethrow; a later one is logged.
          *
          * @param batch The batch the index was claimed from.
          * @param index The claimed index.
@@ -209,7 +222,7 @@ class ThreadPool {
  *        running the first.
  *
  * Serial on a worker thread. Blocks until done, then rethrows the caller's chunk's exception,
- * else the first a queued chunk threw.
+ * else the first a queued chunk threw; any other is logged.
  *
  * @tparam Function Callable taking a size_t index.
  * @param count    Number of indices, counted from 0.
@@ -247,10 +260,7 @@ void parallelFor(size_t count, size_t grain, Function&& function) {
     try {
         runChunk(0);
     } catch (...) {
-        try {
-            pool.waitForBatch(batch);
-        } catch (...) {
-        }
+        pool.waitForBatchAfterThrow(batch);
         throw;
     }
     pool.waitForBatch(batch);

@@ -84,6 +84,17 @@ size_t logicalCpus() {
 #endif
     return std::thread::hardware_concurrency();
 }
+
+/// Say a batch index's throw that no waiter sees, as only one throw a wait is rethrown.
+void logUnrethrown(const std::exception_ptr& error) {
+    try {
+        std::rethrow_exception(error);
+    } catch (const std::exception& e) {
+        LOG_ERROR("ThreadPool batch index threw; its waiter rethrows another throw: %s", e.what());
+    } catch (...) {
+        LOG_ERROR("ThreadPool batch index threw unknown exception; its waiter rethrows another throw");
+    }
+}
 } // namespace
 
 size_t ThreadPool::defaultThreadCount() {
@@ -171,6 +182,14 @@ void ThreadPool::waitForBatch(Batch& batch) {
     if (batch.m_error) std::rethrow_exception(std::exchange(batch.m_error, nullptr));
 }
 
+void ThreadPool::waitForBatchAfterThrow(Batch& batch) {
+    try {
+        waitForBatch(batch);
+    } catch (...) {
+        logUnrethrown(std::current_exception());
+    }
+}
+
 void ThreadPool::shutdown() {
     {
         std::lock_guard<std::mutex> lock(m_tasksMutex);
@@ -237,8 +256,12 @@ void ThreadPool::runIndex(Batch& batch, size_t index) {
     try {
         batch.m_run(batch.m_task, index);
     } catch (...) {
-        std::lock_guard<std::mutex> lock(m_tasksMutex);
-        if (!batch.m_error) batch.m_error = std::current_exception();
+        std::exception_ptr error = std::current_exception();
+        {
+            std::lock_guard<std::mutex> lock(m_tasksMutex);
+            if (!batch.m_error) batch.m_error = std::exchange(error, nullptr);
+        }
+        if (error) logUnrethrown(error);
     }
     retire(batch.m_pending);
 }
