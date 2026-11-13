@@ -379,6 +379,21 @@ TEST("two copies of one library take two names, and unload removes its own copy 
     CHECK(namesIn(built.parent_path()) == std::vector<std::string>{built.filename().string()});
 }
 
+TEST("a copy's name another file already has is stepped past, and that file is left as it was") {
+    const fs::path built = builtLibrary();
+    const std::string copyPrefix = built.stem().string() + ".loaded.";
+    // As another process, counting from zero too, may have written it and be loading it now.
+    const fs::path taken = built.parent_path() / (copyPrefix + "0" + built.extension().string());
+    Vkm::Test::writeText(taken, "another process's copy");
+
+    DynamicLibrary library;
+    REQUIRE(library.loadCopy(built).how == DynamicLibrary::Loaded::Copied);
+    CHECK(answerOf(library) == 42);
+    CHECK(Vkm::Test::readText(taken) == "another process's copy");
+    library.unload();
+    CHECK(fs::exists(taken));
+}
+
 TEST("from a folder that takes no copy the library loads in place, and any other copy failure loads nothing") {
     // A missing library: the copy fails for a reason that is no folder's, and nothing is tried.
     DynamicLibrary refused;

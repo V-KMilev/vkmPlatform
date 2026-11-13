@@ -105,16 +105,15 @@ again and acts on `&`, `|` or `=` outside quotes: so there every argument is quo
 what quotes leave to cmd.exe - a quote, a `%`, a line break - is refused rather than run.
 
 **A dynamic library loaded through a copy** (`loadCopy`) leaves the original free to be rebuilt:
-Windows locks a loaded library against writes. The copy is `<stem>.loaded.<n><extension>` beside
-it, n new to the process, stepping past a name another process holds on Windows, where a loaded file
-cannot be deleted; `unload()` deletes it. A folder that takes no file, read-only as an installed
-program's, loads the original in place. Whether it takes one is asked by making one, as an error code
-cannot tell a read-only folder from a library a linker holds open. Any other failure to copy loads
-nothing, as the original would then be locked against its rebuild.
+Windows locks a loaded library against writes. The copy is `<stem>.loaded.<n><extension>` beside it,
+n new to the process, stepping past a name already taken and leaving it: another process, counting
+from zero too, may be loading it. `unload()` deletes the copy. A folder that takes no file,
+read-only as an installed program's, loads the original in place. Whether it takes one is asked by
+making one, as an error code cannot tell a read-only folder from a library a linker holds open. Any
+other failure to copy loads nothing, as the original would then be locked against its rebuild.
 `sweepCopies` deletes what a process that died left behind, skipping, on Windows, a copy another
-still holds.
-On Linux a library is opened `RTLD_NOW | RTLD_LOCAL`: a missing symbol fails at the load, and a
-library loaded again stays apart from the one before.
+still holds. On Linux a library is opened `RTLD_NOW | RTLD_LOCAL`: a missing symbol fails at the
+load, and a library loaded again stays apart from the one before.
 
 **A file's claim** (`FileLock`) is a lock the system holds, taken without waiting, on a file it
 creates if missing: `flock` on Linux, `LockFileEx` on Windows. A Windows lock is mandatory, so it is

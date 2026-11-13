@@ -71,16 +71,14 @@ DynamicLibrary::Outcome DynamicLibrary::loadCopy(const std::filesystem::path& bu
     namespace fs = std::filesystem;
     unload();
 
-    // Sixteen names is a ceiling, not a dependency: one is stepped past only while another process
-    // holds it. One a process left behind is deleted first; one still held stays, and the copy finds
-    // it there.
+    // Sixteen names is a ceiling, not a dependency: a name already taken is stepped past and left, as
+    // another process, counting from zero too, may be loading it; sweepCopies clears what a process
+    // left behind.
     Outcome outcome;
     fs::path copy;
     for (int attempt = 0; attempt < 16; ++attempt) {
         const std::string name = copyPrefix(built) + std::to_string(g_copies++) + built.extension().string();
         copy = built.parent_path() / name;
-        std::error_code held;
-        fs::remove(copy, held);
         fs::copy_file(built, copy, outcome.error);
         if (outcome.error != std::errc::file_exists) break;
     }

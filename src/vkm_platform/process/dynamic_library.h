@@ -58,7 +58,7 @@ class DynamicLibrary {
          *        can be rebuilt while the copy is loaded: Windows locks a loaded library against writes.
          *
          * The copy is `<stem>.loaded.<n><extension>` beside it, n new to this process, stepping past a
-         * name another process holds on Windows, where a loaded file cannot be deleted. A folder that
+         * name already taken and leaving it, as another process may be loading it. A folder that
          * takes no file - read-only, as an installed program's - loads the original in place. Any
          * other failure to copy loads nothing, since the original would then be locked against its
          * rebuild. unload() deletes the copy.
