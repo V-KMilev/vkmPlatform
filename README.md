@@ -11,8 +11,9 @@ consumer includes neither.
 
 - **The window and its input are the main thread's**, as GLFW requires: create it, poll it
   (`updateInput`), and ask it from the thread that runs the frame.
-- **A closed window accepts every request and performs none**, and its reporters answer zero
-  (`framebufferScale` one), so a windowless program still runs and can still be told to end.
+- **With no window, every request is accepted**: the frame cap still paces `swapBuffers`, and the
+  reporters answer zero (`framebufferScale` one), so a windowless program still runs and can still be
+  told to end.
 - **Keys by where they sit.** `Key::W` is the key a US layout prints W on, whatever the layout;
   `Key` is declared in GLFW's code order. Typed text comes through `InputHandle::text()`, layout
   applied.

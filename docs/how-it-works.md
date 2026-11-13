@@ -10,10 +10,10 @@ surface is hinted before the window exists (a context of some version, or none),
 once it does, and kept to present each frame and set the swap interval: so the window names no
 graphics API, and a renderer is the one place that does.
 
-**A closed window accepts every request and performs none.** Every call checks for the window
-first, its reporters answer zero (`framebufferScale` one), and the close request is a field of its
-own rather than GLFW's, so a program with no window still runs its frames and can still be told to
-end.
+**With no window, every request is accepted.** Each call that reaches the window asks for it first,
+the frame cap still paces `swapBuffers`, its reporters answer zero (`framebufferScale` one), and the
+close request is a field of its own rather than GLFW's, so a program with no window still runs its
+frames and can still be told to end.
 
 **Input arrives by callback, inside `updateInput()`'s poll**, on the main thread. A callback writes
 into the `InputHandle`; the pointer's position is kept by callback and handed over once a frame,

@@ -74,9 +74,9 @@ enum class CursorMode {
 /**
  * @brief Owns the application's window, its WindowSurface, input, and frame limiting.
  *
- * **A closed window accepts every request and performs none**, and reporters answer zero
- * (framebufferScale answers one): a program with no window still runs its frames and can still be
- * told to end.
+ * **With no window, every request is accepted**: the frame cap still paces swapBuffers, and
+ * reporters answer zero (framebufferScale answers one), so a program with no window still runs its
+ * frames and can still be told to end.
  */
 class WindowManager {
     public:

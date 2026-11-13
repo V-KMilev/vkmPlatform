@@ -16,7 +16,7 @@ using Vkm::Platform::WindowManager;
 using Vkm::Platform::WindowMode;
 using Vkm::Platform::WindowSize;
 
-TEST("a window never created takes every request and performs none: its reports are zero and its scale one") {
+TEST("with no window every request is accepted: the reports are zero and the scale one") {
     WindowManager window;
     CHECK(!window.isOpen());
     window.setTitle("headless");

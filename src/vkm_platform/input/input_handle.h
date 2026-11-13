@@ -95,8 +95,8 @@ class InputHandle {
          *
          * The delta is derived, so position and movement cannot disagree.
          *
-         * @param x Cursor X in window pixels, from the left.
-         * @param y Cursor Y in window pixels, from the top.
+         * @param x Cursor X in the window's screen coordinates, from the left.
+         * @param y Cursor Y in the window's screen coordinates, from the top.
          */
         void moveTo(double x, double y);
 
@@ -105,8 +105,8 @@ class InputHandle {
          *
          * The next moveTo() measures from here.
          *
-         * @param x Cursor X in window pixels, from the left.
-         * @param y Cursor Y in window pixels, from the top.
+         * @param x Cursor X in the window's screen coordinates, from the left.
+         * @param y Cursor Y in the window's screen coordinates, from the top.
          */
         void warpTo(double x, double y);
 
@@ -171,28 +171,28 @@ class InputHandle {
         /**
          * @brief The absolute cursor X position.
          *
-         * @return Cursor X in window pixels, from the left.
+         * @return Cursor X in the window's screen coordinates, from the left.
          */
         double getX() const { return m_x; }
 
         /**
          * @brief The absolute cursor Y position.
          *
-         * @return Cursor Y in window pixels, from the top.
+         * @return Cursor Y in the window's screen coordinates, from the top.
          */
         double getY() const { return m_y; }
 
         /**
          * @brief The X movement the last moveTo recorded.
          *
-         * @return Pixels moved along X.
+         * @return The window's screen coordinates moved along X.
          */
         double getDeltaX() const { return m_deltaX; }
 
         /**
          * @brief The Y movement the last moveTo recorded.
          *
-         * @return Pixels moved along Y.
+         * @return The window's screen coordinates moved along Y.
          */
         double getDeltaY() const { return m_deltaY; }
 
