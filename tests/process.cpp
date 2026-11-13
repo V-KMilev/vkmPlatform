@@ -246,6 +246,19 @@ TEST("stop asks a program that asks whether it should stop before it ends it, an
     CHECK(child.takeOutput().find("asked to stop") == std::string::npos);
 }
 
+TEST("stop gives what an asked program started its two seconds to end by itself, though the program left at once") {
+    // Given "leave", the listener first starts a copy of itself that hears no asking and, a second
+    // on, writes "finished".
+    const fs::path listener = Vkm::Platform::executableDir() / VKM_TEST_LISTENER;
+    const fs::path finished = scratch() / "finished";
+    ChildProcess child;
+    REQUIRE(child.start(listener, {"leave", finished.string()}));
+    REQUIRE(outputUntil(child, "started").find("started") != std::string::npos);
+    child.stop();
+    CHECK(child.takeOutput().find("asked to stop") != std::string::npos);
+    CHECK(Vkm::Test::readText(finished) == "finished");
+}
+
 TEST("a child program runs in the folder it is given, each argument whole") {
 #if defined(_WIN32)
     Vkm::Test::skip("the program run here is the POSIX shell");

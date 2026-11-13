@@ -27,6 +27,8 @@ namespace {
 
 constexpr int ASK_MS = 50;  ///< How long the reader waits on a quiet pipe before it asks after the program
 
+constexpr auto STOP_GRACE = std::chrono::seconds(2);  ///< How long what stop() asks has to leave
+
 #if defined(_WIN32)
 
 constexpr DWORD PIPE_BYTES = 1 << 20;  ///< How far a writer may run ahead of the reader waiting out ASK_MS
@@ -53,6 +55,24 @@ std::wstring quoted(const std::wstring& arg) {
     }
     out.append(slashes * 2, L'\\');
     return out + L"\"";
+}
+
+/**
+ * @brief How many processes @p job holds.
+ *
+ * @param job A job a program runs in.
+ * @return Its count; 0 when it cannot be asked, so a wait on it ends.
+ */
+DWORD processesIn(HANDLE job) {
+    JOBOBJECT_BASIC_ACCOUNTING_INFORMATION held{};
+    const BOOL asked = QueryInformationJobObject(
+        job,
+        JobObjectBasicAccountingInformation,
+        &held,
+        sizeof(held),
+        nullptr
+    );
+    return asked ? held.ActiveProcesses : 0;
 }
 
 #else
@@ -244,14 +264,17 @@ void ChildProcess::stop() {
     const bool ending = running();
     if (ending) {
         // Asked first, as SIGTERM asks on POSIX: a program that asks whether it should stop holds
-        // the event named for it, and is given two seconds to leave. Whatever of its job is left
-        // then is ended, and so is a program that never asked, at once. While the process handle
-        // is open, its id names no other process.
+        // the event named for it, and its job is given two seconds to empty. Whatever of the job is
+        // left then is ended, and so is a program that never asked, at once. While the process
+        // handle is open, its id names no other process.
         const std::wstring name = Detail::stopEventName(m_pid);
         if (const HANDLE asked = OpenEventW(EVENT_MODIFY_STATE, FALSE, name.c_str())) {
             SetEvent(asked);
             CloseHandle(asked);
-            WaitForSingleObject(static_cast<HANDLE>(m_process), 2000);
+            const auto deadline = std::chrono::steady_clock::now() + STOP_GRACE;
+            while (processesIn(m_job) > 0 && std::chrono::steady_clock::now() < deadline) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            }
         }
         TerminateJobObject(static_cast<HANDLE>(m_job), 1);
     }
@@ -399,7 +422,7 @@ void ChildProcess::stop() {
     // its group still runs two seconds on is ended. The program is reaped here alone: until then the
     // group's id is its own, and after, what is left of the group holds it.
     kill(-m_pid, SIGTERM);
-    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+    const auto deadline = std::chrono::steady_clock::now() + STOP_GRACE;
     bool reaped = false;
     bool held   = true;
     for (;;) {

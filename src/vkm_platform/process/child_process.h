@@ -50,8 +50,9 @@ class ChildProcess {
          * @brief Ask the program to stop, then end it and everything it started, and wait for it.
          *
          * The asking is SIGTERM to its process group on POSIX, and on Windows the event a program
-         * that calls stopRequested() holds; there one that never called it is ended at once. What
-         * is left two seconds on is ended.
+         * that calls stopRequested() holds. What is left of the group or the job two seconds on is
+         * ended. On Windows, with no program to ask, one that never called it or one that has
+         * exited, the job is ended at once.
          */
         void stop();
 
