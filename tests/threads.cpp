@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <memory>
 #include <mutex>
 #include <stdexcept>
 #include <string>
@@ -287,6 +288,41 @@ TEST("the worker count may be asked on one thread while another shuts the pool d
     asker.join();
     CHECK(wrong.load() == 0);
     CHECK(pool.threadCount() == 0u);
+}
+
+TEST("a task shutdown drops is destroyed outside the pool's lock, so what it holds may call the pool") {
+#if defined(_WIN32)
+    Vkm::Test::skip("a child process here needs fork");
+#else
+    const Vkm::Test::Ended ended = Vkm::Test::inChild([] {
+        // A deadlock ends the child here rather than hang the suite.
+        alarm(10);
+        ThreadPool&         pool = ThreadPool::get();
+        std::atomic<bool>   release{false};
+        std::atomic<size_t> held{0};
+        for (size_t i = 0; i < pool.threadCount(); ++i) {
+            pool.addTask([&] {
+                ++held;
+                while (!release) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            });
+        }
+        while (held < pool.threadCount()) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        {
+            // Queued behind the held workers, so shutdown drops it, and the last copy of this calls the pool.
+            const std::shared_ptr<void> calls(nullptr, [&pool](void*) { pool.addTask([] {}); });
+            pool.addTask([calls] {});
+        }
+        std::thread stopper([&] { pool.shutdown(); });
+        // shutdown() has begun once a task is refused.
+        while (Vkm::Test::logText().find("addTask after shutdown") == std::string::npos) {
+            pool.addTask([] {});
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        release = true;
+        stopper.join();
+    });
+    CHECK(ended == Vkm::Test::Ended::Returned);
+#endif
 }
 
 TEST("after shutdown, parallelFor and a batch run on their caller and a background task is refused") {

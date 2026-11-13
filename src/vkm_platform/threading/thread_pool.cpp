@@ -203,9 +203,13 @@ void ThreadPool::shutdown() {
         }
     }
 
-    // A batch stays: its waiter runs every index no worker claimed.
-    std::lock_guard<std::mutex> lock(m_tasksMutex);
-    m_backgroundTasks.clear();
+    // A batch stays: its waiter runs every index no worker claimed. The tasks are dropped outside the
+    // lock, as what one holds may call the pool as it goes.
+    decltype(m_backgroundTasks) dropped;
+    {
+        std::lock_guard<std::mutex> lock(m_tasksMutex);
+        dropped.swap(m_backgroundTasks);
+    }
 }
 
 void ThreadPool::process() {
