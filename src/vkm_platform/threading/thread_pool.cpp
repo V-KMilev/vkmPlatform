@@ -17,6 +17,7 @@
     #include <sched.h>
 #endif
 
+#include "vkm_log/assert.h"
 #include "vkm_log/logger.h"
 #include "vkm_platform/windows_api.h"
 
@@ -130,6 +131,12 @@ void ThreadPool::addBatch(Batch& batch, size_t count) {
         std::lock_guard<std::mutex> lock(m_tasksMutex);
         if (!m_running) {
             LOG_WARNING("ThreadPool::addBatch after shutdown; the batch is dropped");
+            return;
+        }
+        // Queued again while running, its counters would reset under workers still claiming from it.
+        VKM_ASSERT(batch.m_pending == 0, "a batch queued again before it was waited for");
+        if (batch.m_pending != 0) {
+            LOG_ERROR("A batch was queued again before it was waited for; the second queuing is dropped");
             return;
         }
         batch.m_count   = count;

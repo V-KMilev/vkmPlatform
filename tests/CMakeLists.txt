@@ -12,11 +12,13 @@ add_executable(vkm_platform_tests ${CMAKE_CURRENT_SOURCE_DIR}/harness/main.cpp $
 # glfw for its key codes alone, which the map is checked against.
 target_link_libraries(vkm_platform_tests PRIVATE ${PROJECT_NAME} glfw)
 target_include_directories(vkm_platform_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+# The library's asserts flag, which check.h's VKM_TEST_LIBRARY_ASSERTS reads beside the file's NDEBUG.
 target_compile_definitions(vkm_platform_tests PRIVATE
     VKM_TEST_SUITE="vkm_platform"
     VKM_TEST_LOG
     VKM_TEST_MODULE="$<TARGET_FILE_NAME:vkm_platform_test_module>"
     VKM_TEST_EXECUTABLE="$<TARGET_FILE_NAME:vkm_platform_tests>"
+    VKM_TEST_ASSERTS_FLAG=$<BOOL:${VKM_PLATFORM_ASSERTS}>
 )
 target_compile_options(vkm_platform_tests PRIVATE
     $<$<CXX_COMPILER_ID:GNU,Clang>:${_vkm_platform_warnings}>

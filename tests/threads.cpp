@@ -8,6 +8,10 @@
 #include <thread>
 #include <vector>
 
+#if !defined(_WIN32)
+    #include <unistd.h>
+#endif
+
 #if defined(__linux__)
     #include <sched.h>
 
@@ -274,5 +278,30 @@ TEST("the default worker count is one fewer than the physical cores the process 
         CHECK(countOn({firstCore[0], firstCore[1], oneEachCore[1]}) == 1);
     }
     CHECK(countOn(oneEachCore) == static_cast<int>(std::max<size_t>(oneEachCore.size(), 2) - 1));
+#endif
+}
+
+TEST("a batch queued again before it was waited for stops the program, or without asserts is refused and said") {
+#if defined(_WIN32)
+    Vkm::Test::skip("a child process here needs fork");
+#else
+    const auto ended = Vkm::Test::inChild([] {
+        alarm(10);  // A pool the second queuing broke may never finish the batch.
+        std::atomic<bool> go{false};
+        const auto spin = [&](size_t) {
+            while (!go) std::this_thread::yield();
+        };
+        ThreadPool::Batch batch(spin);
+        ThreadPool::get().addBatch(batch, 4);
+        ThreadPool::get().addBatch(batch, 4);
+        go = true;
+        ThreadPool::get().waitForBatch(batch);
+    });
+    if (VKM_TEST_LIBRARY_ASSERTS) {
+        CHECK(ended == Vkm::Test::Ended::Stopped);
+    } else {
+        CHECK(ended == Vkm::Test::Ended::Returned);
+        CHECK(Vkm::Test::logText().find("queued again") != std::string::npos);
+    }
 #endif
 }
