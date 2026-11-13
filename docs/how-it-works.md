@@ -97,15 +97,16 @@ threw is skipped. The caller's own chunk's throw goes before a queued one's, whi
 **A child process** writes its standard output and error into one pipe, read on a thread of its own,
 so a caller polls `takeOutput()` from its frame. Its input is empty: this process's may be a
 terminal, which stops a reader of another group, or a pipe that never ends. It runs in a group of
-its own on Linux and a job on Windows, so `stop()` ends it and everything it started: asked first,
-by SIGTERM to the group on Linux and the program's stop event on Windows, then what is left of
-either two seconds on is ended; on Windows, with no program to ask, one that never asked or one that
-has exited, the job is ended at once. The reader asks after the program after each read and each
-quiet wait, as a daemon the program left behind holds the pipe open forever. On Linux it leaves the
-program unreaped: its id is its group's, so `stop()`, which reaps it, reaches the group however long
-after the program exited, and nothing else. A batch file runs through cmd.exe, which reads its line
-again and acts on `&`, `|` or `=` outside quotes: so there every argument is quoted, and one holding
-what quotes leave to cmd.exe - a quote, a `%`, a line break - is refused rather than run.
+its own on Linux and a job on Windows, so `stop()` ends it and everything it started, but on Linux
+what left the group, as a daemon's `setsid` does: asked first, by SIGTERM to the group on Linux and
+the program's stop event on Windows, then what is left of either two seconds on is ended; on
+Windows, with no program to ask, one that never asked or one that has exited, the job is ended at
+once. The reader asks after the program after each read and each quiet wait, as a daemon the program
+left behind holds the pipe open forever. On Linux it leaves the program unreaped: its id is its
+group's, so `stop()`, which reaps it, reaches the group however long after the program exited, and
+nothing else. A batch file runs through cmd.exe, which reads its line again and acts on `&`, `|` or
+`=` outside quotes: so there every argument is quoted, and one holding what quotes leave to cmd.exe
+(a quote, a `%`, a line break) is refused rather than run.
 
 **A dynamic library loaded through a copy** (`loadCopy`) leaves the original free to be rebuilt:
 Windows locks a loaded library against writes. The copy is `<stem>.loaded.<n><extension>` beside it,
