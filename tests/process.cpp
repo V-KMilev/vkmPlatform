@@ -245,11 +245,11 @@ TEST("a program named by a relative path is found from this process's working fo
 }
 
 TEST("a program is seen to exit while what it started holds its output") {
+    const fs::path listener = Vkm::Platform::executableDir() / VKM_TEST_LISTENER;
     ChildProcess child;
 #if defined(_WIN32)
     // start /b gives what it starts the batch file's output: here a listener, deaf for ten seconds.
-    const fs::path listener = Vkm::Platform::executableDir() / VKM_TEST_LISTENER;
-    const fs::path batch    = scratch() / "leave.bat";
+    const fs::path batch = scratch() / "leave.bat";
     Vkm::Test::writeText(batch, "@start /b \"\" \"" + listener.string() + "\" deaf\r\n@exit /b 3\r\n");
     REQUIRE(child.start(batch, {}));
 #else
@@ -259,14 +259,19 @@ TEST("a program is seen to exit while what it started holds its output") {
     CHECK(!child.running());
     CHECK(child.exitCode() == 3);
 
-#if !defined(_WIN32)
-    // What it leaves behind writes on, never letting the pipe go quiet.
-    REQUIRE(child.start("/bin/sh", {"-c", "(while :; do echo x; sleep 0.01; done) & exit 4"}));
-    runToExit(child);
-    CHECK(!child.running());
-    CHECK(child.exitCode() == 4);
+    // What it leaves behind writes on without a pause: once the program has exited, what the pipe held
+    // then is read, not all the leftover goes on to write.
+    // Three times, as a reader that drains until the pipe runs dry may stop short by chance.
+    for (int run = 0; run < 3; ++run) {
+        REQUIRE(child.start(listener, {"spill"}));
+        const std::string output = runToExit(child);
+        CHECK(!child.running());
+        CHECK(child.exitCode() == 4);
+        const size_t exiting = output.find("exiting");
+        REQUIRE(exiting != std::string::npos);
+        CHECK(output.size() - exiting < (4u << 20));
+    }
     child.stop();
-#endif
 }
 
 TEST("stop asks a program that asks whether it should stop before it ends it, and ends one that never asks at once") {

@@ -11,6 +11,7 @@
     #include <optional>
     #include <fcntl.h>
     #include <poll.h>
+    #include <sys/ioctl.h>
     #include <sys/wait.h>
     #if defined(__linux__)
         #include <sys/prctl.h>
@@ -239,23 +240,31 @@ bool ChildProcess::start(
 }
 
 void ChildProcess::readUntilExit() {
-    // Peeked, never read blocking: what the program started may hold the pipe open, and quiet, long
-    // after the program exited.
+    // Peeked, never read blocking: what the program started may hold the pipe open, quiet or busy,
+    // long after the program exited. So the program is asked after each read and each quiet wait, and
+    // once it has exited, what the pipe holds then is read, and the rest is not its output.
     const HANDLE pipe    = static_cast<HANDLE>(m_pipe);
     const HANDLE process = static_cast<HANDLE>(m_process);
-    char  buffer[4096];
-    DWORD waiting = 0;
-    bool  exited  = false;
-    while (PeekNamedPipe(pipe, nullptr, 0, nullptr, &waiting, nullptr)) {
-        if (waiting > 0) {
+    char buffer[4096];
+    const auto take = [&](DWORD bytes) {
+        while (bytes > 0) {
             DWORD got = 0;
-            if (!ReadFile(pipe, buffer, std::min<DWORD>(waiting, sizeof(buffer)), &got, nullptr)) break;
+            if (!ReadFile(pipe, buffer, std::min<DWORD>(bytes, sizeof(buffer)), &got, nullptr) || got == 0) {
+                return false;
+            }
             std::lock_guard<std::mutex> lock(m_mutex);
             m_output.append(buffer, got);
-            continue;
+            bytes -= got;
         }
-        if (exited) break;
-        exited = WaitForSingleObject(process, ASK_MS) == WAIT_OBJECT_0;
+        return true;
+    };
+    DWORD waiting = 0;
+    while (PeekNamedPipe(pipe, nullptr, 0, nullptr, &waiting, nullptr)) {
+        if (waiting > 0 && !take(waiting)) break;
+        if (WaitForSingleObject(process, waiting > 0 ? 0 : ASK_MS) == WAIT_OBJECT_0) {
+            if (PeekNamedPipe(pipe, nullptr, 0, nullptr, &waiting, nullptr)) take(waiting);
+            break;
+        }
     }
     WaitForSingleObject(process, INFINITE);
     DWORD code = 0;
@@ -399,31 +408,37 @@ bool ChildProcess::start(
 }
 
 void ChildProcess::readUntilExit() {
-    // The pipe ends when every holder closes it, which a daemon the program left behind never
-    // does: so the program is asked after each read and each quiet wait, and once it has
-    // exited, what is left in the pipe is read and the rest is not its output. It is left for
-    // stop() to reap.
+    // The pipe ends when every holder closes it, which a daemon the program left behind never does:
+    // the program is asked after each read and quiet wait, and once it has exited only what the pipe
+    // holds then is its output. It is left for stop() to reap.
     char buffer[4096];
+    const auto keep = [&](ssize_t got) {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_output.append(buffer, static_cast<size_t>(got));
+    };
     std::optional<int> code;
     for (;;) {
         pollfd waiting{m_pipeFd, POLLIN, 0};
-        const int ready = poll(&waiting, 1, code ? 0 : ASK_MS);
+        const int ready = poll(&waiting, 1, ASK_MS);
         if (ready < 0 && errno == EINTR) continue;
+        if (ready < 0) break;
         if (ready > 0) {
             const ssize_t got = read(m_pipeFd, buffer, sizeof(buffer));
-            if (got > 0) {
-                {
-                    std::lock_guard<std::mutex> lock(m_mutex);
-                    m_output.append(buffer, static_cast<size_t>(got));
-                }
-                if (!code) code = exitOf(m_pid, WNOHANG);
-                continue;
-            }
             if (got < 0 && errno == EINTR) continue;
-            break;
+            if (got <= 0) break;
+            keep(got);
         }
-        if (ready < 0 || code) break;
         code = exitOf(m_pid, WNOHANG);
+        if (code) break;
+    }
+    int left = 0;
+    if (code && ioctl(m_pipeFd, FIONREAD, &left) != 0) left = 0;
+    while (left > 0) {
+        const ssize_t got = read(m_pipeFd, buffer, std::min(sizeof(buffer), static_cast<size_t>(left)));
+        if (got < 0 && errno == EINTR) continue;
+        if (got <= 0) break;
+        keep(got);
+        left -= static_cast<int>(got);
     }
     if (!code) code = exitOf(m_pid, 0);
 

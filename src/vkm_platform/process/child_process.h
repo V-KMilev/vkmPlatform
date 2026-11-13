@@ -87,7 +87,7 @@ class ChildProcess {
          * @brief Collects the output until the program exits, then keeps its exit code.
          *
          * It asks after the program after each read and each quiet wait and, once it has exited,
-         * reads what is left in the pipe, which what the program started may hold open. On Linux it
+         * reads what the pipe holds then, which what the program started may hold open. On Linux it
          * leaves the program for stop() to reap.
          */
         void readUntilExit();

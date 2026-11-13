@@ -2,7 +2,8 @@
 // whether it should stop, and says so when it is asked; given "deaf" it never asks. Either way it
 // says it has started, and ends by itself after ten seconds. Given "leave" and a file, it first
 // starts a copy of itself, given "late" and the file, that hears no asking and, a second on, writes
-// "finished" there and ends.
+// "finished" there and ends. Given "flood" it writes without a pause, ten seconds long; given "spill"
+// it starts a copy of itself given "flood" and, a moment on, says it is exiting and exits with 4.
 
 #include <chrono>
 #include <csignal>
@@ -22,10 +23,12 @@
 
 namespace {
 
-/// Start @p self given "late" and @p file, in this program's job or group, sharing its output.
-void leave(char* self, char* file) {
+/// Start @p self given @p mode and, unless null, @p file, in this program's job or group, sharing its
+/// output.
+void startCopy(char* self, const char* mode, char* file) {
 #if defined(_WIN32)
-    std::string line = std::string("\"") + self + "\" late \"" + file + "\"";
+    std::string line = std::string("\"") + self + "\" " + mode;
+    if (file) line += std::string(" \"") + file + "\"";
     STARTUPINFOA startup{};
     startup.cb = sizeof(startup);
     PROCESS_INFORMATION info{};
@@ -34,11 +37,7 @@ void leave(char* self, char* file) {
         CloseHandle(info.hProcess);
     }
 #else
-    // Ignored from before it runs, as an ignored signal stays so through exec; stopRequested() below
-    // listens for this program alone.
-    std::signal(SIGTERM, SIG_IGN);
-    char  late[] = "late";
-    char* args[] = {self, late, file, nullptr};
+    char* args[] = {self, const_cast<char*>(mode), file, nullptr};
     if (fork() == 0) {
         execv(self, args);
         _exit(127);
@@ -49,12 +48,31 @@ void leave(char* self, char* file) {
 } // namespace
 
 int main(int argc, char** argv) {
+    if (argc > 1 && std::strcmp(argv[1], "flood") == 0) {
+        static const std::string block(65536, 'x');
+        const auto until = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+        while (std::chrono::steady_clock::now() < until) std::fwrite(block.data(), 1, block.size(), stdout);
+        return 0;
+    }
     if (argc > 2 && std::strcmp(argv[1], "late") == 0) {
         std::this_thread::sleep_for(std::chrono::seconds(1));
         std::ofstream(argv[2]) << "finished";
         return 0;
     }
-    if (argc > 2 && std::strcmp(argv[1], "leave") == 0) leave(argv[0], argv[2]);
+    if (argc > 1 && std::strcmp(argv[1], "spill") == 0) {
+        startCopy(argv[0], "flood", nullptr);
+        std::this_thread::sleep_for(std::chrono::milliseconds(300));
+        std::printf("exiting\n");
+        return 4;
+    }
+    if (argc > 2 && std::strcmp(argv[1], "leave") == 0) {
+#if !defined(_WIN32)
+        // Ignored from before the copy runs, as an ignored signal stays so through exec; stopRequested()
+        // below listens for this program alone.
+        std::signal(SIGTERM, SIG_IGN);
+#endif
+        startCopy(argv[0], "late", argv[2]);
+    }
 
     const bool listens = argc < 2 || std::strcmp(argv[1], "deaf") != 0;
     if (listens) Vkm::Platform::stopRequested();
