@@ -103,8 +103,18 @@ process of its own, so `ctest -L vkm_platform` runs them in the tree of a consum
 library as a consumer builds it: its includes, its CMake, and its debug flags. Nothing there opens a
 window: creating one, its callbacks, cursor modes, fullscreen, monitors and the icon are walked by hand.
 
+## Version
+
+0.0.0, set in `CMakeLists.txt`'s `project()`: nothing is released yet. A release is tagged
+`vX.Y.Z` on `master` and listed in [CHANGELOG.md](CHANGELOG.md); work lands on `vkm/dev` first.
+
 ## In vkmEngine
 
 The engine pins it at `modules/vkmPlatform` and links it whole into `libvkm_core`. Its actions,
 bindings and their names are the engine's, on top of this; so is the frame. A change is a commit
 here, then an engine commit that moves the pin.
+
+## License
+
+vkmPlatform is source-available under the [vkmEngine License](LICENSE), the engine's own, which holds
+for each vkm library used alone. [CONTRIBUTING.md](CONTRIBUTING.md) says how a change is shared.
