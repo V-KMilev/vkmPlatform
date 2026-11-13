@@ -58,6 +58,9 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
     vkm_log
 )
 
+# Public: its headers are C++17 (optional, filesystem), so whatever includes them is too.
+target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
+
 # Private: a public header names a GLFW type by its declaration alone, so nothing of the consumer's
 # compiles against GLFW unless it links glfw itself (glfw_api.h). A static library's private link
 # still reaches whatever links it.
