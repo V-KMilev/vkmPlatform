@@ -92,6 +92,7 @@ WindowManager::~WindowManager() {
 }
 
 void WindowManager::createWindow(const std::string& title, std::unique_ptr<WindowSurface> surface) {
+    if (m_windowHandle) throw std::runtime_error("The window is already created");
     m_title = title;
     if (!surface) throw std::runtime_error("A window needs the surface a renderer draws through");
     m_surface = std::move(surface);
@@ -124,7 +125,15 @@ void WindowManager::createWindow(const std::string& title, std::unique_ptr<Windo
     }
 
     // Its context current and its API loaded, with vsync off until setVSync.
-    m_surface->attach(m_windowHandle);
+    try {
+        m_surface->attach(m_windowHandle);
+    } catch (...) {
+        // The surface first, as the destructor does: what it holds may be the window's.
+        m_surface.reset();
+        glfwDestroyWindow(m_windowHandle);
+        m_windowHandle = nullptr;
+        throw;
+    }
 
     glfwGetFramebufferSize(m_windowHandle, &m_width, &m_height);
 

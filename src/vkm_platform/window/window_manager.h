@@ -96,7 +96,8 @@ class WindowManager {
          * @param title   The window title.
          * @param surface What the renderer draws into it through (WindowSurface): hinted
          *                before the window exists, given it after, and kept to present each frame.
-         * @throws std::runtime_error when there is no surface, or GLFW or the surface fails.
+         * @throws std::runtime_error when there is no surface, the window is already created, or GLFW
+         *         or the surface fails; a window the surface failed in is destroyed again.
          */
         void createWindow(const std::string& title, std::unique_ptr<WindowSurface> surface);
 
