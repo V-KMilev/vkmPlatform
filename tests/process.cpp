@@ -292,6 +292,37 @@ TEST("from a folder that takes no copy the library loads in place, and any other
 #endif
 }
 
+TEST("a library that cannot be read is refused, not loaded in place, though its folder takes files") {
+    const fs::path built = builtLibrary();
+#if defined(_WIN32)
+    // Held as a linker holds what it writes: shared with nothing.
+    const HANDLE writer = CreateFileW(
+        built.c_str(),
+        GENERIC_WRITE,
+        0,
+        nullptr,
+        OPEN_EXISTING,
+        FILE_ATTRIBUTE_NORMAL,
+        nullptr
+    );
+    REQUIRE(writer != INVALID_HANDLE_VALUE);
+    DynamicLibrary library;
+    const DynamicLibrary::Outcome outcome = library.loadCopy(built);
+    CloseHandle(writer);
+#else
+    REQUIRE(::chmod(built.c_str(), 0) == 0);
+    const bool readable = ::access(built.c_str(), R_OK) == 0;
+    DynamicLibrary library;
+    const DynamicLibrary::Outcome outcome = library.loadCopy(built);
+    ::chmod(built.c_str(), 0755);
+    if (readable) Vkm::Test::skip("this user reads a file whose mode lets nobody read it");
+#endif
+    CHECK(outcome.how == DynamicLibrary::Loaded::Refused);
+    CHECK(static_cast<bool>(outcome.error));
+    CHECK(!library.isLoaded());
+    CHECK(namesIn(built.parent_path()) == std::vector<std::string>{built.filename().string()});
+}
+
 TEST("sweepCopies removes the copies a process left behind, and nothing else beside them") {
     const fs::path built  = builtLibrary();
     const fs::path folder = built.parent_path();

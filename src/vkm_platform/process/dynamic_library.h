@@ -19,7 +19,7 @@ class DynamicLibrary {
          */
         enum class Loaded : uint8_t {
             Copied,   ///< From a copy beside it.
-            InPlace,  ///< From the library itself: its folder takes no copy.
+            InPlace,  ///< From the library itself: its folder takes no file.
             Refused,  ///< Not tried: the copy failed for another reason.
         };
 
@@ -59,9 +59,9 @@ class DynamicLibrary {
          *
          * The copy is `<stem>.loaded.<n><extension>` beside it, n new to this process, stepping past a
          * name another process holds on Windows, where a loaded file cannot be deleted. A folder that
-         * takes no copy - read-only, as an installed program's -
-         * loads the original in place. Any other failure to copy loads nothing, since the original
-         * would then be locked against its rebuild. unload() deletes the copy.
+         * takes no file - read-only, as an installed program's - loads the original in place. Any
+         * other failure to copy loads nothing, since the original would then be locked against its
+         * rebuild. unload() deletes the copy.
          *
          * @param built The library as its build wrote it.
          * @return How it went about the load; isLoaded() says whether the loader took the file, and

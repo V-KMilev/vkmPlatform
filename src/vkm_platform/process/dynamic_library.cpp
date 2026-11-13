@@ -3,6 +3,7 @@
 #include "vkm_platform/process/dynamic_library.h"
 
 #include <atomic>
+#include <fstream>
 
 #include "vkm_log/logger.h"
 
@@ -29,6 +30,13 @@ void deleteCopy(const std::filesystem::path& copy) {
     std::error_code ec;
     std::filesystem::remove(copy, ec);
     if (ec) LOG_WARNING("Cannot delete '%s': %s", copy.string().c_str(), ec.message().c_str());
+}
+
+// Whether the folder takes a file at @p copy, where a copy failed; the file made is deleted again.
+bool takesFile(const std::filesystem::path& copy) {
+    if (!std::ofstream(copy, std::ios::binary).is_open()) return false;
+    deleteCopy(copy);
+    return true;
 }
 
 } // namespace
@@ -63,17 +71,18 @@ DynamicLibrary::Outcome DynamicLibrary::loadCopy(const std::filesystem::path& bu
     namespace fs = std::filesystem;
     unload();
 
-    // Sixteen names is a ceiling, not a dependency: one is taken only while another process holds it.
+    // Sixteen names is a ceiling, not a dependency: one is stepped past only while another process
+    // holds it. One a process left behind is deleted first; one still held stays, and the copy finds
+    // it there.
     Outcome outcome;
     fs::path copy;
     for (int attempt = 0; attempt < 16; ++attempt) {
         const std::string name = copyPrefix(built) + std::to_string(g_copies++) + built.extension().string();
         copy = built.parent_path() / name;
-        std::error_code ignored;
-        fs::remove(copy, ignored);
-        outcome.error.clear();
-        fs::copy_file(built, copy, fs::copy_options::overwrite_existing, outcome.error);
-        if (!outcome.error) break;
+        std::error_code held;
+        fs::remove(copy, held);
+        fs::copy_file(built, copy, outcome.error);
+        if (outcome.error != std::errc::file_exists) break;
     }
 
     if (!outcome.error) {
@@ -86,12 +95,12 @@ DynamicLibrary::Outcome DynamicLibrary::loadCopy(const std::filesystem::path& bu
         return outcome;
     }
 
-    // In place only where the folder refuses writes; anywhere else the build would be locked by the
-    // library it is meant to replace.
-    const std::error_code& error = outcome.error;
-    const bool readOnly = error == std::errc::permission_denied
-        || error == std::errc::read_only_file_system
-        || error == std::errc::operation_not_permitted;
+    // In place only from a folder that takes no file, as an installed program's: from any other the
+    // build would be locked by the library it is meant to replace. Every name held, or no library
+    // there, is no folder's doing.
+    const bool readOnly = outcome.error != std::errc::file_exists
+        && outcome.error != std::errc::no_such_file_or_directory
+        && !takesFile(copy);
     if (!readOnly) return outcome;
 
     outcome.how = Loaded::InPlace;
