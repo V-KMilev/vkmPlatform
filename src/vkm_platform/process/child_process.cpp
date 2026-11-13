@@ -345,12 +345,12 @@ std::string ChildProcess::takeOutput() {
     return out;
 }
 
-bool ChildProcess::running() {
+bool ChildProcess::running() const {
     std::lock_guard<std::mutex> lock(m_mutex);
     return m_running;
 }
 
-int ChildProcess::exitCode() {
+int ChildProcess::exitCode() const {
     std::lock_guard<std::mutex> lock(m_mutex);
     return m_exitCode;
 }

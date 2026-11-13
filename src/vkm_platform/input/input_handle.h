@@ -218,8 +218,8 @@ class InputHandle {
         bool m_buttonStruck[BUTTONS] = {};  ///< Went down since the last clearStrikes().
         bool m_buttonHeld[BUTTONS]   = {};  ///< Down at the last clearStrikes().
 
-        double m_x = 0.0;
-        double m_y = 0.0;
+        double m_x      = 0.0;
+        double m_y      = 0.0;
         double m_deltaX = 0.0;
         double m_deltaY = 0.0;
 

@@ -58,8 +58,8 @@ class ThreadPool {
                 friend class ThreadPool;
 
             private:
-                void (*m_run)(const void* task, size_t index);
-                const void* m_task;
+                void (*m_run)(const void* task, size_t index) = nullptr;
+                const void* m_task = nullptr;
                 size_t      m_count   = 0;          ///< Indices of the run queued last; set by addBatch.
                 size_t      m_claimed = 0;          ///< Indices handed out; guarded by the pool's mutex.
                 std::exception_ptr m_error;         ///< First an index threw; guarded by the pool's mutex.

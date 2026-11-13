@@ -12,7 +12,6 @@
 #include "vkm_platform/window/window_surface.h"
 
 struct GLFWwindow;
-struct GLFWmonitor;
 
 namespace Vkm::Platform {
 
@@ -66,10 +65,10 @@ std::optional<MouseButton> mouseButtonFromGlfw(int code);
  * @brief Cursor visibility and confinement for the application window.
  */
 enum class CursorMode {
-    Normal   = 0,    ///< Visible, free to leave the window.
-    Hidden   = 1,    ///< Invisible, unrestricted.
-    Disabled = 2,    ///< Hidden and confined, as an FPS camera wants.
-    Captured = 3     ///< Visible but confined.
+    Normal,    ///< Visible, free to leave the window.
+    Hidden,    ///< Invisible, unrestricted.
+    Disabled,  ///< Hidden and confined, as a first-person camera wants.
+    Captured   ///< Visible but confined.
 };
 
 /**

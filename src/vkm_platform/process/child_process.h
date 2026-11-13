@@ -62,14 +62,14 @@ class ChildProcess {
          *
          * @return True while it runs.
          */
-        bool running();
+        bool running() const;
 
         /**
          * @brief How the last program exited.
          *
          * @return Its exit code; -1 while it runs, when none started, or when it was stopped.
          */
-        int exitCode();
+        int exitCode() const;
 
     private:
         /**
@@ -82,11 +82,11 @@ class ChildProcess {
         void readUntilExit();
 
     private:
-        std::mutex  m_mutex;
-        std::string m_output;
-        int         m_exitCode = -1;
-        bool        m_running = false;
-        std::thread m_reader;
+        mutable std::mutex m_mutex;
+        std::string        m_output;
+        int                m_exitCode = -1;
+        bool               m_running  = false;
+        std::thread        m_reader;
 
 #if defined(_WIN32)
         void* m_process = nullptr;

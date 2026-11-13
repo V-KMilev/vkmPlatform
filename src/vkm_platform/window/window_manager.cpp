@@ -20,7 +20,6 @@ namespace Vkm::Platform {
 
 namespace {
 
-// Window-creation defaults.
 constexpr int DEFAULT_WINDOW_WIDTH  = 1920;
 constexpr int DEFAULT_WINDOW_HEIGHT = 1080;
 
@@ -81,6 +80,8 @@ const GLFWvidmode* currentVideoMode(GLFWwindow* window) {
 WindowManager::WindowManager() = default;
 
 WindowManager::~WindowManager() {
+    // The surface first: what it holds of the window goes before the window.
+    m_surface.reset();
     if (m_windowHandle) {
         glfwDestroyWindow(m_windowHandle);
         m_windowHandle = nullptr;
@@ -463,25 +464,22 @@ void WindowManager::applyCursor() {
     if (!m_windowHandle) return;
 
     const CursorMode mode = m_cursorFree ? CursorMode::Normal : m_cursorMode;
-    auto glfwmode = GLFW_CURSOR_NORMAL;
+    auto glfwMode = GLFW_CURSOR_NORMAL;
     switch (mode) {
         case CursorMode::Normal:
-            glfwmode = GLFW_CURSOR_NORMAL;
+            glfwMode = GLFW_CURSOR_NORMAL;
             break;
         case CursorMode::Hidden:
-            glfwmode = GLFW_CURSOR_HIDDEN;
+            glfwMode = GLFW_CURSOR_HIDDEN;
             break;
         case CursorMode::Disabled:
-            glfwmode = GLFW_CURSOR_DISABLED;
+            glfwMode = GLFW_CURSOR_DISABLED;
             break;
         case CursorMode::Captured:
-            glfwmode = GLFW_CURSOR_CAPTURED;
+            glfwMode = GLFW_CURSOR_CAPTURED;
             break;
-        default:
-            LOG_ERROR("Invalid cursor mode: %d", static_cast<int>(mode));
-            return;
     }
-    glfwSetInputMode(m_windowHandle, GLFW_CURSOR, glfwmode);
+    glfwSetInputMode(m_windowHandle, GLFW_CURSOR, glfwMode);
 
     // Entering and leaving Disabled warps the cursor, which is no movement of the user's.
     glfwGetCursorPos(m_windowHandle, &m_cursorX, &m_cursorY);
