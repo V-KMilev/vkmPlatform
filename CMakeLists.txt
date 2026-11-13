@@ -28,7 +28,7 @@ endif()
 
 # Debug features follow flags, each off unless the consumer turns it on.
 option(VKM_PLATFORM_ASSERTS  "Keep the library's VKM_ASSERTs on whatever the build type" OFF)
-option(VKM_PLATFORM_PROFILER "Its two frame zones as Tracy zones; needs the consumer's TracyClient target" OFF)
+option(VKM_PLATFORM_PROFILER "Its two frame zones in Tracy; needs the consumer's TracyClient target" OFF)
 
 if(VKM_PLATFORM_PROFILER AND NOT TARGET TracyClient)
     message(FATAL_ERROR
@@ -43,8 +43,8 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/modules)
 # somewhere else.
 file(GLOB_RECURSE VKM_PLATFORM_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
 
-# Static and position-independent: a consumer links it whole into a shared library of its own,
-# as the engine does into libvkm_core, so it ships no binary of its own.
+# Static and position-independent: a consumer links it whole into a shared library of its own, so
+# it ships no binary of its own.
 add_library(${PROJECT_NAME} STATIC ${VKM_PLATFORM_SOURCES})
 set_target_properties(${PROJECT_NAME} PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
@@ -73,8 +73,7 @@ if(WIN32)
     target_link_libraries(${PROJECT_NAME} PRIVATE winmm)
 endif()
 
-# The engine's warning set, so a file reads the same on either side of the boundary. Clang reads the
-# doc blocks: a @param naming no parameter is an error.
+# Its warning set. Clang reads the doc blocks: a @param naming no parameter is an error.
 set(_vkm_platform_warnings
     -Wall
     -Wextra

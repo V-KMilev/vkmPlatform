@@ -76,7 +76,8 @@ enum class CursorMode {
  * @brief Owns the application's window, its WindowSurface, input, and frame limiting.
  *
  * **A closed window accepts every request and performs none**, and reporters answer zero
- * (framebufferScale answers one): a windowless world still ticks and must still be able to end.
+ * (framebufferScale answers one): a program with no window still runs its frames and can still be
+ * told to end.
  */
 class WindowManager {
     public:
@@ -94,7 +95,7 @@ class WindowManager {
          * @brief Creates the main application window with the specified title.
          *
          * @param title   The window title.
-         * @param surface What the graphics backend draws into it through (WindowSurface): hinted
+         * @param surface What the renderer draws into it through (WindowSurface): hinted
          *                before the window exists, given it after, and kept to present each frame.
          * @throws std::runtime_error when there is no surface, or GLFW or the surface fails.
          */
@@ -158,7 +159,10 @@ class WindowManager {
         std::vector<WindowSize> renderResolutions() const;
 
         /**
-         * @brief Updates all input states (keyboard, mouse, etc.).
+         * @brief Poll the window's events into the InputHandle: the scroll reset first, the
+         *        pointer's step measured once.
+         *
+         * Strikes, typed keys and text stay until the caller's InputHandle::clearStrikes().
          */
         void updateInput();
 
@@ -200,9 +204,9 @@ class WindowManager {
 
         /**
          * @brief Show the cursor and let it go, whatever cursorMode() says, while @p free: as a menu
-         *        that pauses the game takes the pointer back.
+         *        takes the pointer back.
          *
-         * cursorMode() keeps what the game set, so the cursor returns to it once freed no longer.
+         * cursorMode() keeps what was set, so the cursor returns to it once freed no longer.
          *
          * @param free Whether the cursor is free.
          */
@@ -263,7 +267,7 @@ class WindowManager {
         const InputHandle& getInputHandle() const { return m_inputHandle; }
 
         /**
-         * @brief Keep the files dropped on the window for takeDroppedFiles(); off until a host that
+         * @brief Keep the files dropped on the window for takeDroppedFiles(); off until a caller that
          *        takes them asks, so one that never does keeps none.
          *
          * @param keep Whether to keep them.
@@ -313,7 +317,7 @@ class WindowManager {
         /**
          * @brief Height in pixels of the monitor this window is on.
          *
-         * The monitor, not the window, so the answer survives a maximise or fullscreen switch.
+         * The monitor, not the window, so the answer survives a maximize or fullscreen switch.
          *
          * @return Monitor height in pixels, or 0 when there is no window.
          */
@@ -323,7 +327,7 @@ class WindowManager {
         /**
          * @brief Set the cached drawable dimensions, from the framebuffer-size callback.
          *
-         * Unsynchronised: GLFW callbacks fire in glfwPollEvents() on the main thread.
+         * Unsynchronized: GLFW callbacks fire in glfwPollEvents() on the main thread.
          *
          * @param width New framebuffer width in pixels.
          * @param height New framebuffer height in pixels.
@@ -342,11 +346,11 @@ class WindowManager {
 
     private:
         GLFWwindow*                    m_windowHandle = nullptr;
-        std::unique_ptr<WindowSurface> m_surface;  ///< The backend's tie to the window; null headless.
+        std::unique_ptr<WindowSurface> m_surface;  ///< The renderer's tie to the window; null headless.
         std::string m_title;
 
-        bool m_closeRequested = false;  ///< Ours rather than GLFW's, so a windowless world can still be told
-                                        ///< to end.
+        bool m_closeRequested = false;  ///< Ours rather than GLFW's, so a program with no window can still be
+                                        ///< told to end.
 
         int m_width  = 0;    ///< Framebuffer pixels.
         int m_height = 0;
@@ -363,7 +367,7 @@ class WindowManager {
         WindowMode m_windowMode = WindowMode::Windowed;
         bool       m_vsync      = false;
         std::vector<std::string> m_dropped;              ///< Until takeDroppedFiles().
-        bool                     m_keepDropped = false;  ///< Whether a host takes them.
+        bool                     m_keepDropped = false;  ///< Whether a caller takes them.
 };
 
 } // namespace Vkm::Platform

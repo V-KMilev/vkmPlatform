@@ -36,8 +36,8 @@ them keeps none.
 `Key` and `MouseButton` are declared in GLFW's code order, and the window maps a code to one through
 two tables in `window_manager.cpp`, each checked at compile time to hold a code for every key, in
 rising order and ending at GLFW's last: so a code is found by bisection, a walk over the keys meets
-them as a walk over the codes does, and a GLFW that grows a key fails to compile until it has a
-name. A code no key has, as `GLFW_KEY_UNKNOWN`, is dropped there.
+them as a walk over the codes does, and a GLFW with a key past its last fails to compile until it has
+a name. A code no key has, as `GLFW_KEY_UNKNOWN`, is dropped there.
 
 ## The device state
 
@@ -66,8 +66,7 @@ by `SwapBuffers`, so its name does not change.
 
 `ThreadPool::get()` is the process's one pool, made on first use with one worker fewer than the
 physical cores the process may run on (its affinity; a core's SMT siblings counted once), as the
-thread that calls `parallelFor` runs a chunk too, and the driver's, the audio's and the system's
-threads need room.
+thread that calls `parallelFor` runs a chunk too, and the process's other threads need room.
 
 - **Waiting is per batch, never global.** The pool runs background tasks too, and a barrier on
   everything in flight would park a frame behind a file read.
@@ -85,8 +84,9 @@ threads need room.
 `parallelFor(count, function)` runs a small range on the caller and cuts a larger one into several
 chunks per thread, so a thread the system preempts leaves its share to the others rather than
 stretching the join. Called from a worker it runs serially there: the other workers are busy, so
-nested chunks would only come back at a lock each. A throw reaches the caller after the whole range
-has run, since the queued chunks reach into the caller's frame.
+nested chunks would only come back at a lock each. A throw reaches the caller after every other
+chunk has run, since the queued chunks reach into the caller's frame; the rest of the chunk that
+threw is skipped.
 
 ## Processes
 
@@ -98,10 +98,12 @@ program left behind holds the pipe open forever.
 
 **A dynamic library loaded through a copy** (`loadCopy`) leaves the original free to be rebuilt:
 Windows locks a loaded library against writes. The copy is `<stem>.loaded.<n><extension>` beside
-it, n new to the process, stepping past a name another process holds; `unload()` deletes it. A
+it, n new to the process, stepping past a name another process holds on Windows, where a loaded file
+cannot be deleted; `unload()` deletes it. A
 folder that takes no copy, read-only as an installed program's, loads the original in place. Any
 other failure to copy loads nothing, as the original would then be locked against its rebuild.
-`sweepCopies` deletes what a process that died left behind, skipping a copy another still holds.
+`sweepCopies` deletes what a process that died left behind, skipping, on Windows, a copy another
+still holds.
 On Linux a library is opened `RTLD_NOW | RTLD_LOCAL`: a missing symbol fails at the load, and a
 library loaded again stays apart from the one before.
 

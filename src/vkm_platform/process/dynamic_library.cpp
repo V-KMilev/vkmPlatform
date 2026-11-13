@@ -60,7 +60,8 @@ DynamicLibrary::Outcome DynamicLibrary::loadCopy(const std::filesystem::path& bu
     Outcome outcome;
     fs::path copy;
     for (int attempt = 0; attempt < 16; ++attempt) {
-        copy = built.parent_path() / (copyPrefix(built) + std::to_string(g_copies++) + built.extension().string());
+        const std::string name = copyPrefix(built) + std::to_string(g_copies++) + built.extension().string();
+        copy                   = built.parent_path() / name;
         std::error_code ignored;
         fs::remove(copy, ignored);
         outcome.error.clear();

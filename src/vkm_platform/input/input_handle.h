@@ -11,7 +11,7 @@ namespace Vkm::Platform {
  * @brief One frame of raw device state: keys and buttons down, cursor position and wheel turn.
  *
  * Source-agnostic, which keeps the windowing library out of the input path. Main thread only, so
- * unsynchronised. A key or button also records a strike since the last clearStrikes(): one poll
+ * unsynchronized. A key or button also records a strike since the last clearStrikes(): one poll
  * can deliver a press and its release together, which the level alone would miss.
  */
 class InputHandle {

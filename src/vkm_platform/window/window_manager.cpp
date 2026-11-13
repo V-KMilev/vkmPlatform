@@ -69,7 +69,7 @@ GLFWmonitor* getCurrentMonitor(GLFWwindow* window) {
  * @brief The video mode of the monitor the window is on, or null if there isn't one.
  *
  * Found by overlap, as glfwGetWindowMonitor names one only when fullscreen. Null-safe for a
- * headless host or one with no output, since GLFW asserts on a null handle.
+ * program with no window or a machine with no output, since GLFW asserts on a null handle.
  */
 const GLFWvidmode* currentVideoMode(GLFWwindow* window) {
     if (!window) return nullptr;
@@ -92,7 +92,7 @@ WindowManager::~WindowManager() {
 
 void WindowManager::createWindow(const std::string& title, std::unique_ptr<WindowSurface> surface) {
     m_title = title;
-    if (!surface) throw std::runtime_error("A window needs the surface a backend draws through");
+    if (!surface) throw std::runtime_error("A window needs the surface a renderer draws through");
     m_surface = std::move(surface);
 
     if (!glfwInit()) {
@@ -228,12 +228,12 @@ void WindowManager::requestClose() {
     LOG_INFO("Close requested");
     m_closeRequested = true;
 
-    // Mirrored for GLFW readers; the loop reads the field, so a windowless world can stop.
+    // Mirrored for GLFW readers; the loop reads the field, so a program with no window can stop.
     if (m_windowHandle) glfwSetWindowShouldClose(m_windowHandle, GLFW_TRUE);
 }
 
 void WindowManager::cancelClose() {
-    LOG_VERBOSE("Pending close cancelled");
+    LOG_VERBOSE("Pending close canceled");
     m_closeRequested = false;
     if (m_windowHandle) glfwSetWindowShouldClose(m_windowHandle, GLFW_FALSE);
 }
@@ -274,7 +274,7 @@ void WindowManager::updateMode(WindowMode windowMode) {
         return;
     }
 
-    // Windowed is a centred 75% rect: a full-monitor one would look like borderless fullscreen.
+    // Windowed is a centered 75% rect: a full-monitor one would look like borderless fullscreen.
     int targetX       = 0;
     int targetY       = 0;
     int targetW       = mode->width;

@@ -1,7 +1,6 @@
 # Every #include under src/vkm_platform is the library's own, the standard library's or vkmLog's;
 # GLFW only through glfw_api.h, and that in .cpp files alone; the Windows headers only through
-# windows_api.h; POSIX's in .cpp files; Tracy only in profile.h, behind VKM_PLATFORM_PROFILER
-# (cmake -P, -DSOURCE_DIR=<src>).
+# windows_api.h; POSIX's in .cpp files; Tracy only in profile.h (cmake -P, -DSOURCE_DIR=<src>).
 
 set(_posix "dlfcn.h|fcntl.h|poll.h|sched.h|unistd.h|sys/[a-z]+\\.h")
 

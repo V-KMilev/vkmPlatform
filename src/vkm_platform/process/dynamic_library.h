@@ -54,7 +54,8 @@ class DynamicLibrary {
          *        can be rebuilt while the copy is loaded: Windows locks a loaded library against writes.
          *
          * The copy is `<stem>.loaded.<n><extension>` beside it, n new to this process, stepping past a
-         * name another process holds. A folder that takes no copy - read-only, as an installed game's -
+         * name another process holds on Windows, where a loaded file cannot be deleted. A folder that
+         * takes no copy - read-only, as an installed program's -
          * loads the original in place. Any other failure to copy loads nothing, since the original
          * would then be locked against its rebuild. unload() deletes the copy.
          *
@@ -66,7 +67,7 @@ class DynamicLibrary {
 
         /**
          * @brief Delete the copies loadCopy() left beside @p built when a process ended without
-         *        unloading, best effort: one another process still holds open is skipped.
+         *        unloading, best effort: on Windows, one another process still holds open is skipped.
          *
          * @param built The library as its build wrote it.
          */

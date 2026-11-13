@@ -1,4 +1,4 @@
-// The window manager with no window: what a headless host, a server or a test, relies on.
+// The window manager with no window: what a program with no window, or a test, relies on.
 
 #include <sstream>
 #include <string>

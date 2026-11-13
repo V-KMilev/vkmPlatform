@@ -38,6 +38,7 @@ while (!stopRequested() && window.beginFrame()) {
     const InputHandle& input = window.getInputHandle();
     if (input.wasKeyStruck(Key::Escape)) window.requestClose();
     // ... draw
+    window.getInputHandle().clearStrikes();  // the frame's strikes and text are read
     window.swapBuffers();
 }
 ThreadPool::get().shutdown();  // before main returns
@@ -76,20 +77,20 @@ too.
 
 ## What it holds
 
-| Header                         | What                                                                 |
-|--------------------------------|----------------------------------------------------------------------|
-| `window/window_manager.h`      | `WindowManager`, `WindowMode`, `CursorMode`, `WindowSize`, `fittingWindowSizes`, `keyFromGlfw` |
-| `window/window_surface.h`      | `WindowSurface`: what a renderer asks of the window                  |
-| `window/frame_limiter.h`       | `FrameLimiter`: a frame cap, slept then spun                         |
-| `input/key.h`                  | `Key`, `MouseButton`                                                 |
-| `input/input_handle.h`         | `InputHandle`: one frame of keys, buttons, pointer, scroll and text  |
-| `threading/thread_pool.h`      | `ThreadPool`, `parallelFor`, `parallelGrain`                         |
-| `process/dynamic_library.h`    | `DynamicLibrary`: load, load through a copy, symbols                 |
-| `process/child_process.h`      | `ChildProcess`: a program run in the background, its output collected |
-| `process/this_process.h`       | `executableDir`, `userConfigDir`, `userStateDir`, `attachParentConsole`, `stopRequested` |
-| `process/discrete_gpu.h`       | `VKM_PLATFORM_PREFER_DISCRETE_GPU()`, for an executable's `main.cpp` |
-| `glfw_api.h`                   | GLFW's header, for code that links `glfw` itself                     |
-| `windows_api.h`                | The Windows headers, for the library's own sources                   |
+| Header                      | What                                                                                                                  |
+|-----------------------------|-----------------------------------------------------------------------------------------------------------------------|
+| `window/window_manager.h`   | `WindowManager`, `WindowMode`, `CursorMode`, `WindowSize`, `fittingWindowSizes`, `keyFromGlfw`, `mouseButtonFromGlfw` |
+| `window/window_surface.h`   | `WindowSurface`: what a renderer asks of the window                                                                   |
+| `window/frame_limiter.h`    | `FrameLimiter`: a frame cap, slept then spun                                                                          |
+| `input/key.h`               | `Key`, `MouseButton`                                                                                                  |
+| `input/input_handle.h`      | `InputHandle`: one frame of keys, buttons, pointer, scroll and text                                                   |
+| `threading/thread_pool.h`   | `ThreadPool`, `parallelFor`, `parallelGrain`                                                                          |
+| `process/dynamic_library.h` | `DynamicLibrary`: load, load through a copy, symbols                                                                  |
+| `process/child_process.h`   | `ChildProcess`: a program run in the background, its output collected                                                 |
+| `process/this_process.h`    | `executableDir`, `userConfigDir`, `userStateDir`, `attachParentConsole`, `stopRequested`                              |
+| `process/discrete_gpu.h`    | `VKM_PLATFORM_PREFER_DISCRETE_GPU()`, for an executable's `main.cpp`                                                  |
+| `glfw_api.h`                | GLFW's header, for code that links `glfw` itself                                                                      |
+| `windows_api.h`             | The Windows headers, for the library's own sources                                                                    |
 
 Each is under `src/vkm_platform/`.
 

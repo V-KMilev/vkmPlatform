@@ -85,7 +85,7 @@ TEST("from a worker, parallelFor runs the whole range on that worker") {
     CHECK(worker != std::this_thread::get_id());
 }
 
-TEST("a throw in parallelFor reaches its caller once every other index has run") {
+TEST("a throw in parallelFor reaches its caller once every other chunk has run") {
     std::atomic<int> ran{0};
     std::string      caught;
     try {

@@ -15,10 +15,9 @@ namespace Vkm::Platform {
 /**
  * @brief Fixed-size pool of worker threads draining two task queues.
  *
- * Waiting is per-batch, so a caller never blocks on work someone else queued. Batches (the frame
- * is blocked on them) are served before addTask's background tasks. That cannot starve the
- * background for long: only the frame fills the batch queue, and a batch must be joined within
- * the frame that added it.
+ * Waiting is per-batch, so a caller never blocks on work someone else queued. Batches, each with a
+ * caller blocked on it, are served before addTask's background tasks. That cannot starve the
+ * background for long: only a caller that waits fills the batch queue.
  */
 class ThreadPool {
     public:
@@ -103,7 +102,7 @@ class ThreadPool {
         void addTask(std::function<void()> && task);
 
         /**
-         * @brief Queue indices 0 to @p count of @p batch as one entry and wake all workers.
+         * @brief Queue indices [0, @p count) of @p batch as one entry and wake all workers.
          *
          * Refused after shutdown() with the counter left at zero, so waitForBatch() returns.
          *
@@ -189,7 +188,7 @@ class ThreadPool {
 
         std::vector<std::thread> m_threads;
 
-        std::vector<Batch*>    m_frameTasks;       ///< From addBatch, an entry a batch until its last index
+        std::vector<Batch*>    m_batches;          ///< From addBatch, an entry a batch until its last index
                                                    ///< is claimed; drained first. Kept, so a batch queued
                                                    ///< allocates nothing.
         std::deque<QueuedTask> m_backgroundTasks;  ///< From addTask; drained when idle.
@@ -226,7 +225,7 @@ void parallelFor(size_t count, size_t grain, Function&& function) {
 
     auto& pool = ThreadPool::get();
 
-    // No workers after shutdown (or with no cores reported): a submission would never retire.
+    // No workers after shutdown(): a submission would never retire.
     if (pool.threadCount() == 0) {
         for (size_t i = 0; i < count; ++i) function(i);
         return;

@@ -13,7 +13,7 @@ namespace Vkm::Platform {
  *
  * Standard output and error share one pipe, read on a thread of the process's own, so
  * a caller polls takeOutput() and running() from its frame. stop() ends the program and
- * everything it started - a build's compilers included - so nothing outlives it. Should
+ * everything it started - its children included - so nothing outlives it. Should
  * this process die without stopping it, the program is ended too: on Windows with all it
  * started, its job's; on Linux it alone is sent SIGTERM, and what it started is its own to
  * end. Linux sends it when the thread that started the program ends, so start one from a

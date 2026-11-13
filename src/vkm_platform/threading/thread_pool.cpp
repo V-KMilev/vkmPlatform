@@ -143,7 +143,7 @@ void ThreadPool::addBatch(Batch& batch, size_t count) {
         batch.m_claimed = 0;
         batch.m_error   = nullptr;
         batch.m_pending += batch.m_count;
-        m_frameTasks.push_back(&batch);
+        m_batches.push_back(&batch);
     }
 
     m_tasksCV.notify_all();
@@ -158,11 +158,11 @@ void ThreadPool::waitForBatch(Batch& batch) {
             size_t index = 0;
             {
                 std::lock_guard<std::mutex> lock(m_tasksMutex);
-                const auto entry = std::find(m_frameTasks.begin(), m_frameTasks.end(), &batch);
-                if (entry == m_frameTasks.end()) break;
+                const auto entry = std::find(m_batches.begin(), m_batches.end(), &batch);
+                if (entry == m_batches.end()) break;
 
                 index = batch.m_claimed++;
-                if (batch.m_claimed == batch.m_count) m_frameTasks.erase(entry);
+                if (batch.m_claimed == batch.m_count) m_batches.erase(entry);
             }
             runIndex(batch, index);
         }
@@ -194,8 +194,8 @@ void ThreadPool::shutdown() {
     {
         std::lock_guard<std::mutex> lock(m_tasksMutex);
         // A batch's one entry stands for every index not yet claimed.
-        for (Batch* batch : m_frameTasks) batch->m_pending -= batch->m_count - batch->m_claimed;
-        m_frameTasks.clear();
+        for (Batch* batch : m_batches) batch->m_pending -= batch->m_count - batch->m_claimed;
+        m_batches.clear();
         m_backgroundTasks.clear();
     }
     m_doneCV.notify_all();
@@ -208,18 +208,18 @@ void ThreadPool::process() {
         {
             std::unique_lock<std::mutex> lock(m_tasksMutex);
             m_tasksCV.wait(lock, [this]() {
-                return !m_frameTasks.empty() || !m_backgroundTasks.empty() || !m_running;
+                return !m_batches.empty() || !m_backgroundTasks.empty() || !m_running;
             });
 
             if (!m_running) continue;
 
-            // The frame first; the class comment says why this cannot starve. A batch stays at the
+            // Batches first; the class comment says why this cannot starve. A batch stays at the
             // front until its last index is claimed.
-            if (!m_frameTasks.empty()) {
-                Batch* batch = m_frameTasks.front();
+            if (!m_batches.empty()) {
+                Batch* batch = m_batches.front();
                 queued.batch = batch;
                 queued.index = batch->m_claimed++;
-                if (batch->m_claimed == batch->m_count) m_frameTasks.erase(m_frameTasks.begin());
+                if (batch->m_claimed == batch->m_count) m_batches.erase(m_batches.begin());
             } else if (!m_backgroundTasks.empty()) {
                 queued = std::move(m_backgroundTasks.front());
                 m_backgroundTasks.pop_front();

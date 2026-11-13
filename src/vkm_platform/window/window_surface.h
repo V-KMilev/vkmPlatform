@@ -7,12 +7,12 @@ struct GLFWwindow;
 namespace Vkm::Platform {
 
 /**
- * @brief What a graphics backend asks of the window it draws into: the window's one tie to an API.
+ * @brief What a renderer asks of the window it draws into: the window's one tie to a graphics API.
  *
  * The window needs to know its surface before it exists - a context of some version, or none - and
  * hands the window over once it does; presenting a frame and the swap interval are the API's too.
- * A backend implements it, and a host hands it to WindowManager::createWindow, so the window
- * names no API.
+ * A renderer implements it, and its program hands it to WindowManager::createWindow, so the
+ * window names no API.
  */
 class WindowSurface {
     public:
