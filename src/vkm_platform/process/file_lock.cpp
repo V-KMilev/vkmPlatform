@@ -4,10 +4,6 @@
 
 #include <utility>
 
-#include "vkm_log/logger.h"
-
-#include "vkm_platform/windows_api.h"
-
 #if !defined(_WIN32)
     #include <cerrno>
     #include <cstring>
@@ -15,6 +11,10 @@
     #include <sys/file.h>
     #include <unistd.h>
 #endif
+
+#include "vkm_log/logger.h"
+
+#include "vkm_platform/windows_api.h"
 
 namespace Vkm::Platform {
 

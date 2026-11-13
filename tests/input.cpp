@@ -61,8 +61,8 @@ TEST("a mouse button that goes down is struck, one held is not, and one let go a
 
 TEST("typed text arrives in order and is gone after clearStrikes") {
     InputHandle input;
-    for (const char32_t c : std::u32string(U"hé\U0001F600!")) input.onText(c);
-    CHECK(input.text() == std::u32string(U"hé\U0001F600!"));
+    for (const char32_t c : std::u32string(U"h\u00e9\U0001F600!")) input.onText(c);
+    CHECK(input.text() == std::u32string(U"h\u00e9\U0001F600!"));
     input.clearStrikes();
     CHECK(input.text().empty());
 }

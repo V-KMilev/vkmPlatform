@@ -4,9 +4,6 @@
 #include <chrono>
 #include <system_error>
 
-#include "vkm_platform/process/stop_event.h"
-#include "vkm_platform/windows_api.h"
-
 #if !defined(_WIN32)
     #include <cerrno>
     #include <csignal>
@@ -20,6 +17,9 @@
     #endif
     #include <unistd.h>
 #endif
+
+#include "vkm_platform/process/stop_event.h"
+#include "vkm_platform/windows_api.h"
 
 namespace Vkm::Platform {
 

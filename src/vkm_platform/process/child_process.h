@@ -98,7 +98,8 @@ class ChildProcess {
 #if defined(_WIN32)
         void*         m_process = nullptr;
         unsigned long m_pid     = 0;        ///< Names its stop event (stopRequested)
-        void*         m_job     = nullptr;  ///< Holds the program and all it starts, so stop() ends them together
+        void*         m_job     = nullptr;  ///< Holds the program and all it starts, so stop() ends
+                                            ///< them together
         void*         m_pipe    = nullptr;
 #else
         int m_pid    = 0;   ///< Also its group's id, which holds all it starts; stop() alone reaps it

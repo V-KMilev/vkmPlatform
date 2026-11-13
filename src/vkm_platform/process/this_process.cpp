@@ -7,15 +7,15 @@
 #include <cstdio>
 #include <cstdlib>
 
-#include "vkm_log/logger.h"
-
-#include "vkm_platform/process/stop_event.h"
-#include "vkm_platform/windows_api.h"
-
 #if !defined(_WIN32)
     #include <climits>
     #include <unistd.h>
 #endif
+
+#include "vkm_log/logger.h"
+
+#include "vkm_platform/process/stop_event.h"
+#include "vkm_platform/windows_api.h"
 
 namespace Vkm::Platform {
 

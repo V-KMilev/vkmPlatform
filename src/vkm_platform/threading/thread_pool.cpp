@@ -19,6 +19,7 @@
 
 #include "vkm_log/assert.h"
 #include "vkm_log/logger.h"
+
 #include "vkm_platform/windows_api.h"
 
 namespace Vkm::Platform {
@@ -107,7 +108,7 @@ bool ThreadPool::isWorkerThread() {
     return t_isWorker;
 }
 
-ThreadPool::ThreadPool(size_t threadCount) : m_running(true) {
+ThreadPool::ThreadPool(size_t threadCount) {
     LOG_INFO("Thread pool: %zu worker(s) beside the main thread", threadCount);
     for (size_t i = 0; i < threadCount; ++i) {
         m_threads.emplace_back([this]() { process(); });

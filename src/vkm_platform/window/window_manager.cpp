@@ -8,13 +8,13 @@
 #include <optional>
 #include <stdexcept>
 
+#include "vkm_log/logger.h"
+
 #include "vkm_platform/glfw_api.h"
 
 #include "vkm_platform/input/input_handle.h"
 #include "vkm_platform/profile.h"
 #include "vkm_platform/window/frame_limiter.h"
-
-#include "vkm_log/logger.h"
 
 namespace Vkm::Platform {
 

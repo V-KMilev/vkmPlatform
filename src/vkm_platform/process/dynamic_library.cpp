@@ -5,13 +5,13 @@
 #include <atomic>
 #include <fstream>
 
-#include "vkm_log/logger.h"
-
-#include "vkm_platform/windows_api.h"
-
 #if !defined(_WIN32)
     #include <dlfcn.h>
 #endif
+
+#include "vkm_log/logger.h"
+
+#include "vkm_platform/windows_api.h"
 
 namespace Vkm::Platform {
 

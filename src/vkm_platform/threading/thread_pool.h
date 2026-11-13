@@ -203,7 +203,7 @@ class ThreadPool {
         void retire(std::atomic<size_t>& pending);
 
     private:
-        std::atomic<bool> m_running;
+        std::atomic<bool> m_running{true};
 
         std::vector<std::thread> m_threads;  ///< Sized by the constructor alone, so read unlocked.
 
