@@ -316,13 +316,15 @@ void ChildProcess::stop() {
     if (!m_reader.joinable()) return;
     const bool ending = running();
     if (ending) {
-        // Asked first; whatever is still holding the pipe two seconds on is ended.
+        // Asked first; whatever of its group still runs two seconds on is ended, the program or what
+        // it started. Watched from while the program runs, so the group's id names nothing else.
         kill(-m_pid, SIGTERM);
         const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
-        while (running() && std::chrono::steady_clock::now() < deadline) {
+        bool held = true;
+        while ((held = kill(-m_pid, 0) == 0) && std::chrono::steady_clock::now() < deadline) {
             std::this_thread::sleep_for(std::chrono::milliseconds(20));
         }
-        if (running()) kill(-m_pid, SIGKILL);
+        if (held) kill(-m_pid, SIGKILL);
     }
     m_reader.join();
     if (ending) {

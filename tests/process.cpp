@@ -124,6 +124,31 @@ TEST("a child program is heard, reports its exit code and can be stopped, and a 
 #endif
 }
 
+TEST("stop ends what a child started that outlives its asking, though the program itself ended at once") {
+#if defined(_WIN32)
+    Vkm::Test::skip("the program run here is the POSIX shell");
+#else
+    // The program ends when asked; what it started does not hear the asking.
+    ChildProcess child;
+    const fs::path started   = scratch() / "started";
+    const std::string script = "(trap '' TERM; exec sleep 60) & echo $! > \"$0\"; wait";
+    REQUIRE(child.start("/bin/sh", {"-c", script, started.string()}));
+    for (int i = 0; i < 5000 && Vkm::Test::readText(started).empty(); ++i) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    const pid_t below = static_cast<pid_t>(std::atoi(Vkm::Test::readText(started).c_str()));
+    REQUIRE(below > 0);
+    child.stop();
+    CHECK(!child.running());
+    bool gone = false;
+    for (int i = 0; i < 5000 && !(gone = ::kill(below, 0) != 0); ++i) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    CHECK(gone);
+    if (!gone) ::kill(below, SIGKILL);
+#endif
+}
+
 TEST("a child program runs in the folder it is given, each argument whole") {
 #if defined(_WIN32)
     Vkm::Test::skip("the program run here is the POSIX shell");
