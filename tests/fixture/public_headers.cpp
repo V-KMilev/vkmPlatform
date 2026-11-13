@@ -7,6 +7,7 @@
 #include "vkm_platform/process/child_process.h"
 #include "vkm_platform/process/discrete_gpu.h"
 #include "vkm_platform/process/dynamic_library.h"
+#include "vkm_platform/process/file_lock.h"
 #include "vkm_platform/process/this_process.h"
 #include "vkm_platform/threading/thread_pool.h"
 #include "vkm_platform/window/frame_limiter.h"

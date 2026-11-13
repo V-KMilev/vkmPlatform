@@ -1,4 +1,5 @@
-// Processes: a child program, a dynamic library and its copy, this process's folders and its stop.
+// Processes: a child program, a dynamic library and its copy, a file's claim, this process's folders
+// and its stop.
 
 #include <algorithm>
 #include <chrono>
@@ -8,6 +9,7 @@
 #include <filesystem>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #if defined(_WIN32)
@@ -22,6 +24,7 @@
 #include "vkm_platform/process/child_process.h"
 #include "vkm_platform/process/discrete_gpu.h"
 #include "vkm_platform/process/dynamic_library.h"
+#include "vkm_platform/process/file_lock.h"
 #include "vkm_platform/process/this_process.h"
 
 #include "harness/check.h"
@@ -36,6 +39,7 @@ namespace fs = std::filesystem;
 
 using Vkm::Platform::ChildProcess;
 using Vkm::Platform::DynamicLibrary;
+using Vkm::Platform::FileLock;
 using Vkm::Test::scratch;
 
 using Answer = int (*)();
@@ -302,6 +306,70 @@ TEST("the executable's folder is the suite's, and the user's folders follow the 
     CHECK(Vkm::Platform::userConfigDir().empty());
     CHECK(Vkm::Platform::userStateDir().empty());
 #endif
+}
+
+TEST("a file's claim is refused to a second, from this process too, and taken once the first is gone") {
+    const fs::path path = scratch() / "claim";
+    {
+        FileLock first(path);
+        REQUIRE(first.held());
+        CHECK(fs::exists(path));
+        const FileLock second(path);
+        CHECK(!second.held());
+        const FileLock moved(std::move(first));
+        CHECK(moved.held());
+        CHECK(!FileLock(path).held());
+    }
+    const FileLock again(path);
+    CHECK(again.held());
+    // Refused for its holder, which is no failure.
+    CHECK(Vkm::Test::logText().empty());
+}
+
+TEST("a claimed file is read and written through another handle, this process's own too") {
+    // As a log is: claimed, then written by a logger that opens it itself, its first line at byte 0.
+    const fs::path path = scratch() / "claim";
+    const FileLock held(path);
+    REQUIRE(held.held());
+    Vkm::Test::writeText(path, "a line\n");
+    CHECK(Vkm::Test::readText(path) == "a line\n");
+}
+
+TEST("a claim refused for any reason but its holder says why") {
+#if defined(_WIN32)
+    // The null device opens as a file does, and takes no lock.
+    const FileLock device(fs::path("NUL"));
+    if (device.held()) Vkm::Test::skip("this system's null device takes a lock");
+    CHECK(Vkm::Test::logText().find("'NUL'") != std::string::npos);
+#else
+    Vkm::Test::skip("every file Linux opens here takes a flock, or is refused it for its holder");
+#endif
+}
+
+TEST("a file a claim makes takes the mode any file the process writes takes") {
+#if defined(_WIN32)
+    Vkm::Test::skip("a mode is POSIX's");
+#else
+    // No mask, so a mode chosen by the claim shows as itself rather than through the user's umask.
+    const mode_t mask = ::umask(0);
+    const fs::path claimed = scratch() / "claim";
+    const fs::path written = scratch() / "written";
+    const FileLock held(claimed);
+    Vkm::Test::writeText(written, "");
+    ::umask(mask);
+    REQUIRE(held.held());
+    CHECK(fs::status(claimed).permissions() == fs::status(written).permissions());
+#endif
+}
+
+TEST("a file's claim ends with its process, even one that aborts") {
+    const fs::path path = scratch() / "claim";
+    const Vkm::Test::Ended ended = Vkm::Test::inChild([&] {
+        const FileLock held(path);
+        if (held.held()) std::abort();
+    });
+    CHECK(ended == Vkm::Test::Ended::Stopped);
+    CHECK(FileLock(path).held());
 }
 
 TEST("a process that asks whether it should stop is not killed by SIGINT or SIGTERM, and is told") {

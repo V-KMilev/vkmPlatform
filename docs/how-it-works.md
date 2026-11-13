@@ -107,6 +107,13 @@ still holds.
 On Linux a library is opened `RTLD_NOW | RTLD_LOCAL`: a missing symbol fails at the load, and a
 library loaded again stays apart from the one before.
 
+**A file's claim** (`FileLock`) is a lock the system holds, taken without waiting, on a file it
+creates if missing: `flock` on Linux, `LockFileEx` on Windows. A Windows lock is mandatory, so it is
+on one byte past any end a file reaches: on a byte a read or a write reached, it would refuse them to
+every other handle, the process's own too, and a log claimed could not be written. A second claim,
+from this process or another, is refused, and the system lets a claim go when its process ends,
+however it ends, so a crash leaves none behind. The file is not inherited by a child process.
+
 **This process.** `executableDir`, and where the system keeps a user's configuration and state,
 read from the environment on each call (`%APPDATA%` and `%LOCALAPPDATA%`; `$XDG_CONFIG_HOME` and
 `$XDG_STATE_HOME`, else under `$HOME`), wide on Windows, where the narrow environment mangles a

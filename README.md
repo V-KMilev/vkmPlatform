@@ -87,6 +87,7 @@ too.
 | `threading/thread_pool.h`   | `ThreadPool`, `parallelFor`, `parallelGrain`                                                                          |
 | `process/dynamic_library.h` | `DynamicLibrary`: load, load through a copy, symbols                                                                  |
 | `process/child_process.h`   | `ChildProcess`: a program run in the background, its output collected                                                 |
+| `process/file_lock.h`       | `FileLock`: an exclusive claim on a file, refused to a second and let go when its process ends                        |
 | `process/this_process.h`    | `executableDir`, `userConfigDir`, `userStateDir`, `attachParentConsole`, `stopRequested`                              |
 | `process/discrete_gpu.h`    | `VKM_PLATFORM_PREFER_DISCRETE_GPU()`, for an executable's `main.cpp`                                                  |
 | `glfw_api.h`                | GLFW's header, for code that links `glfw` itself                                                                      |
