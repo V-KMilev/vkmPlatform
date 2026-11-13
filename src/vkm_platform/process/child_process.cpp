@@ -1,5 +1,6 @@
 #include "vkm_platform/process/child_process.h"
 
+#include <algorithm>
 #include <chrono>
 
 #include "vkm_platform/process/stop_event.h"
@@ -23,7 +24,11 @@ namespace Vkm::Platform {
 
 namespace {
 
+constexpr int ASK_MS = 50;  ///< How long the reader waits on a quiet pipe before it asks after the program
+
 #if defined(_WIN32)
+
+constexpr DWORD PIPE_BYTES = 1 << 20;  ///< How far a writer may run ahead of the reader waiting out ASK_MS
 
 /**
  * @brief One argument quoted as CommandLineToArgvW reads it back.
@@ -136,7 +141,7 @@ bool ChildProcess::start(
     SECURITY_ATTRIBUTES inherit{sizeof(SECURITY_ATTRIBUTES), nullptr, TRUE};
     HANDLE readEnd = nullptr;
     HANDLE writeEnd = nullptr;
-    if (!CreatePipe(&readEnd, &writeEnd, &inherit, 0)) {
+    if (!CreatePipe(&readEnd, &writeEnd, &inherit, PIPE_BYTES)) {
         m_output = "could not open a pipe to the program\n";
         return false;
     }
@@ -192,15 +197,27 @@ bool ChildProcess::start(
 }
 
 void ChildProcess::readUntilExit() {
-    char buffer[4096];
-    DWORD got = 0;
-    while (ReadFile(static_cast<HANDLE>(m_pipe), buffer, sizeof(buffer), &got, nullptr) && got > 0) {
-        std::lock_guard<std::mutex> lock(m_mutex);
-        m_output.append(buffer, got);
+    // Peeked, never read blocking: what the program started may hold the pipe open, and quiet, long
+    // after the program exited.
+    const HANDLE pipe    = static_cast<HANDLE>(m_pipe);
+    const HANDLE process = static_cast<HANDLE>(m_process);
+    char  buffer[4096];
+    DWORD waiting = 0;
+    bool  exited  = false;
+    while (PeekNamedPipe(pipe, nullptr, 0, nullptr, &waiting, nullptr)) {
+        if (waiting > 0) {
+            DWORD got = 0;
+            if (!ReadFile(pipe, buffer, std::min<DWORD>(waiting, sizeof(buffer)), &got, nullptr)) break;
+            std::lock_guard<std::mutex> lock(m_mutex);
+            m_output.append(buffer, got);
+            continue;
+        }
+        if (exited) break;
+        exited = WaitForSingleObject(process, ASK_MS) == WAIT_OBJECT_0;
     }
-    WaitForSingleObject(static_cast<HANDLE>(m_process), INFINITE);
+    WaitForSingleObject(process, INFINITE);
     DWORD code = 0;
-    GetExitCodeProcess(static_cast<HANDLE>(m_process), &code);
+    GetExitCodeProcess(process, &code);
 
     std::lock_guard<std::mutex> lock(m_mutex);
     m_exitCode = static_cast<int>(code);
@@ -323,9 +340,9 @@ bool ChildProcess::start(
 
 void ChildProcess::readUntilExit() {
     // The pipe ends when every holder closes it, which a daemon the program left behind never
-    // does: so the program is asked after between reads, and once it has exited, what is left in
-    // the pipe is read and the rest is not its output. It is left for stop() to reap.
-    constexpr int ASK_MS = 50;
+    // does: so the program is asked after each read and each quiet wait, and once it has
+    // exited, what is left in the pipe is read and the rest is not its output. It is left for
+    // stop() to reap.
     char buffer[4096];
     std::optional<int> code;
     for (;;) {
@@ -335,8 +352,11 @@ void ChildProcess::readUntilExit() {
         if (ready > 0) {
             const ssize_t got = read(m_pipeFd, buffer, sizeof(buffer));
             if (got > 0) {
-                std::lock_guard<std::mutex> lock(m_mutex);
-                m_output.append(buffer, static_cast<size_t>(got));
+                {
+                    std::lock_guard<std::mutex> lock(m_mutex);
+                    m_output.append(buffer, static_cast<size_t>(got));
+                }
+                if (!code) code = exitOf(m_pid, WNOHANG);
                 continue;
             }
             if (got < 0 && errno == EINTR) continue;
