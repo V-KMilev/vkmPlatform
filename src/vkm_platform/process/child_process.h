@@ -34,7 +34,11 @@ class ChildProcess {
         /**
          * @brief Start @p program with @p args in @p workingDir, ending any program started before.
          *
-         * @param program The executable, by path.
+         * @param program The executable, by path; a relative one with a folder part is found from this
+         *                process's working folder, whatever @p workingDir is. A bare name is too on
+         *                POSIX; on Windows CreateProcess searches for it (this process's executable's
+         *                folder, the working folder, the system's folders, then the path), and cmd.exe
+         *                for a batch file (@p workingDir, then the path).
          * @param args Its arguments, each passed as one argument. A batch file's (.bat, .cmd) are read by
          *             cmd.exe too, so one holding a quote, a % or a line break is refused.
          * @param workingDir Where it runs; empty keeps this process's.

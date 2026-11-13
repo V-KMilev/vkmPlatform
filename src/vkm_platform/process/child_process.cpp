@@ -138,7 +138,12 @@ bool ChildProcess::start(
     // as written; /v:off keeps a ! as written.
     const std::wstring ext = program.extension().wstring();
     const bool batch = _wcsicmp(ext.c_str(), L".cmd") == 0 || _wcsicmp(ext.c_str(), L".bat") == 0;
-    std::vector<std::wstring> words = {program.wstring()};
+    // A path with a folder part is this process's, as on POSIX: cmd.exe would look for a batch file
+    // from workingDir, and the program finds itself by its own argv[0].
+    std::error_code unresolved;
+    const bool partOfPath = program.is_relative() && program.has_parent_path();
+    const std::filesystem::path found = partOfPath ? std::filesystem::absolute(program, unresolved) : program;
+    std::vector<std::wstring> words = {(unresolved ? program : found).wstring()};
     for (const std::string& arg : args) words.push_back(std::filesystem::path(arg).wstring());
 
     std::wstring command;
@@ -216,7 +221,8 @@ bool ChildProcess::start(
         }
         CloseHandle(readEnd);
         if (job) CloseHandle(job);
-        const std::string path  = program.string();
+        // The program as it was looked for, as on POSIX.
+        const std::string path  = (unresolved ? program : found).string();
         const std::string where = dir.empty() ? path : path + " in " + workingDir.string();
         const std::string why   = std::system_category().message(static_cast<int>(error));
         m_output = "could not start " + where + ": " + why + "\n";
@@ -308,8 +314,14 @@ bool ChildProcess::start(
     // Everything the child needs is made here: between fork and exec it may not allocate.
     const std::string path = program.string();
     const std::string dir = workingDir.string();
+    // A relative program is found from this process's working folder, as on Windows: the child
+    // changes to workingDir before its exec.
+    std::error_code unresolved;
+    const std::filesystem::path found = std::filesystem::absolute(program, unresolved);
+    const std::string exe = unresolved ? path : found.string();
     std::vector<char*> argv;
-    argv.push_back(const_cast<char*>(path.c_str()));
+    // The program as it was found, as it runs in workingDir: one that finds itself by argv[0] finds it.
+    argv.push_back(const_cast<char*>(exe.c_str()));
     for (const std::string& arg : args) argv.push_back(const_cast<char*>(arg.c_str()));
     argv.push_back(nullptr);
 
@@ -348,7 +360,7 @@ bool ChildProcess::start(
         dup2(fds[1], STDOUT_FILENO);
         dup2(fds[1], STDERR_FILENO);
         if (!dir.empty() && chdir(dir.c_str()) != 0) failStart(status[1]);
-        execv(path.c_str(), argv.data());
+        execv(exe.c_str(), argv.data());
         failStart(status[1]);
     }
     close(fds[1]);
@@ -373,7 +385,8 @@ bool ChildProcess::start(
         int ended = 0;
         while (waitpid(pid, &ended, 0) < 0 && errno == EINTR) {}
         close(fds[0]);
-        const std::string where = dir.empty() ? path : path + " in " + dir;
+        // The program as it was looked for, as it was not looked for in workingDir.
+        const std::string where = dir.empty() ? exe : exe + " in " + dir;
         m_output = "could not start " + where + ": " + std::strerror(error) + "\n";
         return false;
     }

@@ -218,6 +218,32 @@ TEST("a program that cannot have its pipe does not start, and says why") {
 #endif
 }
 
+TEST("a program named by a relative path is found from this process's working folder, whatever it runs in") {
+    const fs::path listener = Vkm::Platform::executableDir() / VKM_TEST_LISTENER;
+    // With a folder part, as a bare name is looked for elsewhere on Windows.
+    fs::path relative = fs::relative(listener, fs::current_path());
+    if (!relative.has_parent_path()) relative = fs::path(".") / relative;
+    // Given "leave", it starts a copy of itself by its argv[0] from scratch(), which writes the file.
+    const fs::path finished = scratch() / "finished.txt";
+    ChildProcess child;
+    REQUIRE(child.start(relative, {"leave", finished.string()}, scratch()));
+    CHECK(outputUntil(child, "started").find("started") != std::string::npos);
+    for (int i = 0; i < 5000 && Vkm::Test::readText(finished).empty(); ++i) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    CHECK(Vkm::Test::readText(finished) == "finished");
+    child.stop();
+
+#if defined(_WIN32)
+    // A batch file too, which cmd.exe would otherwise look for from the folder it runs in.
+    const fs::path batch = scratch() / "sub" / "hello.bat";
+    Vkm::Test::writeText(batch, "@echo hello\r\n");
+    fs::create_directories(scratch() / "elsewhere");
+    REQUIRE(child.start(fs::relative(batch, fs::current_path()), {}, scratch() / "elsewhere"));
+    CHECK(runToExit(child).find("hello") != std::string::npos);
+#endif
+}
+
 TEST("a program is seen to exit while what it started holds its output") {
     ChildProcess child;
 #if defined(_WIN32)
@@ -320,7 +346,7 @@ TEST("a batch file gets each argument whole, or does not start") {
     Vkm::Test::writeText(batch, "@echo [%1] [%2] [%3] [%4]\r\n");
     ChildProcess child;
     REQUIRE(child.start(batch, {"Tom&echo.INJECTED", "two words", "x=y", "C:\\dir\\"}));
-    const std::string output = runToExit(child);
+    const std::string output   = runToExit(child);
     const std::string expected = "[\"Tom&echo.INJECTED\"] [\"two words\"] [\"x=y\"] [\"C:\\dir\\\"]";
     CHECK(output.find(expected) != std::string::npos);
     CHECK(child.exitCode() == 0);
