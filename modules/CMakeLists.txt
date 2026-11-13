@@ -12,6 +12,11 @@ if(NOT TARGET glfw)
     set(GLFW_BUILD_TESTS    OFF CACHE BOOL "" FORCE)
     set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
     set(GLFW_INSTALL        OFF CACHE BOOL "" FORCE)
+    # Static unless the consumer said otherwise: left empty, GLFW would follow a BUILD_SHARED_LIBS
+    # meant for the consumer's own libraries.
+    if(NOT GLFW_LIBRARY_TYPE)
+        set(GLFW_LIBRARY_TYPE STATIC CACHE STRING "GLFW's library type: STATIC unless the consumer says" FORCE)
+    endif()
 
     # SYSTEM: its headers reach this library as system headers, so its warning set is not applied to
     # code it does not own.
