@@ -4,6 +4,8 @@
 // starts a copy of itself, given "late" and the file, that hears no asking and, a second on, writes
 // "finished" there and ends. Given "flood" it writes without a pause, ten seconds long; given "spill"
 // it starts a copy of itself given "flood" and, a moment on, says it is exiting and exits with 4.
+// Given "load" and a library, it first loads a copy of it and never asks, so stop() ends it with the
+// copy loaded, as a crash would.
 
 #include <chrono>
 #include <csignal>
@@ -19,6 +21,7 @@
     #include <unistd.h>
 #endif
 
+#include "vkm_platform/process/dynamic_library.h"
 #include "vkm_platform/process/this_process.h"
 
 namespace {
@@ -74,7 +77,11 @@ int main(int argc, char** argv) {
         startCopy(argv[0], "late", argv[2]);
     }
 
-    const bool listens = argc < 2 || std::strcmp(argv[1], "deaf") != 0;
+    Vkm::Platform::DynamicLibrary library;
+    const bool loads = argc > 2 && std::strcmp(argv[1], "load") == 0;
+    if (loads && library.loadCopy(argv[2]).how != Vkm::Platform::DynamicLibrary::Loaded::Copied) return 6;
+
+    const bool listens = argc < 2 || (std::strcmp(argv[1], "deaf") != 0 && !loads);
     if (listens) Vkm::Platform::stopRequested();
     std::printf("started\n");
     std::fflush(stdout);

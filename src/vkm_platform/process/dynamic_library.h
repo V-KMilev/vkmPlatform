@@ -57,11 +57,11 @@ class DynamicLibrary {
          * @brief Load a copy of the library at @p built, unloading any loaded before it, so the original
          *        can be rebuilt while the copy is loaded: Windows locks a loaded library against writes.
          *
-         * The copy is `<stem>.loaded.<n><extension>` beside it, n new to this process, stepping past a
-         * name already taken and leaving it, as another process may be loading it. A folder that
-         * takes no file - read-only, as an installed program's - loads the original in place. Any
-         * other failure to copy loads nothing, since the original would then be locked against its
-         * rebuild. unload() deletes the copy.
+         * The copy is `<stem>.loaded.<pid>.<n><extension>` beside it: this process's id, so no other
+         * process's copy takes its name, and n new to this process, stepping past a name an ended
+         * process with the same id left. A folder that takes no file - read-only, as an installed
+         * program's - loads the original in place. Any other failure to copy loads nothing, since the
+         * original would then be locked against its rebuild. unload() deletes the copy.
          *
          * @param built The library as its build wrote it.
          * @return How it went about the load; isLoaded() says whether the loader took the file, and
@@ -71,7 +71,11 @@ class DynamicLibrary {
 
         /**
          * @brief Delete the copies loadCopy() left beside @p built when a process ended without
-         *        unloading, best effort: on Windows, one another process still holds open is skipped.
+         *        unloading, best effort.
+         *
+         * Every `<stem>.loaded.*<extension>` there goes but one whose name gives a process that runs,
+         * this one included, as that process may be between making its copy and loading it. On
+         * Windows, one another program holds open stays too.
          *
          * @param built The library as its build wrote it.
          */

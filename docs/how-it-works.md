@@ -109,15 +109,18 @@ nothing else. A batch file runs through cmd.exe, which reads its line again and 
 (a quote, a `%`, a line break) is refused rather than run.
 
 **A dynamic library loaded through a copy** (`loadCopy`) leaves the original free to be rebuilt:
-Windows locks a loaded library against writes. The copy is `<stem>.loaded.<n><extension>` beside it,
-n new to the process, stepping past a name already taken and leaving it: another process, counting
-from zero too, may be loading it. `unload()` deletes the copy. A folder that takes no file,
-read-only as an installed program's, loads the original in place. Whether it takes one is asked by
-making one, as an error code cannot tell a read-only folder from a library a linker holds open. Any
-other failure to copy loads nothing, as the original would then be locked against its rebuild.
-`sweepCopies` deletes what a process that died left behind, skipping, on Windows, a copy another
-still holds. On Linux a library is opened `RTLD_NOW | RTLD_LOCAL`: a missing symbol fails at the
-load, and a library loaded again stays apart from the one before.
+Windows locks a loaded library against writes. The copy is `<stem>.loaded.<pid>.<n><extension>`
+beside it: the process's id, so two processes loading one library at once never share a name, and n
+new to the process, stepping past a name an ended process with the same id left. `unload()` deletes
+the copy. A folder that takes no file, read-only as an installed program's, loads the original in
+place. Whether it takes one is asked by making one, as an error code cannot tell a read-only folder
+from a library a linker holds open. Any other failure to copy loads nothing, as the original would
+then be locked against its rebuild. `sweepCopies` deletes what a process that died left behind, and
+leaves the copy of a process that runs, this one's too, as it may be between making its copy and
+loading it. Whether one runs is asked of the system by the id in the name, `kill(pid, 0)` on Linux
+and `OpenProcess` on Windows, and one it may not ask after is taken to run. On Windows a copy another
+program holds open stays too. On Linux a library is opened `RTLD_NOW | RTLD_LOCAL`: a missing symbol
+fails at the load, and a library loaded again stays apart from the one before.
 
 **A file's claim** (`FileLock`) is a lock the system holds, taken without waiting, on a file it
 creates if missing: `flock` on Linux, `LockFileEx` on Windows. A Windows lock is mandatory, so it is

@@ -432,10 +432,15 @@ TEST("two copies of one library take two names, and unload removes its own copy 
 }
 
 TEST("a copy's name another file already has is stepped past, and that file is left as it was") {
+#if defined(_WIN32)
+    const unsigned long pid = GetCurrentProcessId();
+#else
+    const unsigned long pid = static_cast<unsigned long>(getpid());
+#endif
     const fs::path built = builtLibrary();
-    const std::string copyPrefix = built.stem().string() + ".loaded.";
-    // As another process, counting from zero too, may have written it and be loading it now.
-    const fs::path taken = built.parent_path() / (copyPrefix + "0" + built.extension().string());
+    const std::string firstCopy = built.stem().string() + ".loaded." + std::to_string(pid) + ".0";
+    // As a process that ended, and had this one's id, may have left it.
+    const fs::path taken = built.parent_path() / (firstCopy + built.extension().string());
     Vkm::Test::writeText(taken, "another process's copy");
 
     DynamicLibrary library;
@@ -530,20 +535,50 @@ TEST("sweepCopies removes the copies a process left behind, and nothing else bes
     CHECK(namesIn(folder) == expected);
 }
 
+TEST("sweepCopies leaves the copies of processes that run, this one's too, and takes what an ended one left") {
+    // Given "load", the listener loads a copy and never asks, so stop() ends it with the copy loaded.
+    const fs::path built  = builtLibrary();
+    const fs::path folder = built.parent_path();
+    ChildProcess other;
+    REQUIRE(other.start(Vkm::Platform::executableDir() / VKM_TEST_LISTENER, {"load", built.string()}));
+    REQUIRE(outputUntil(other, "started").find("started") != std::string::npos);
+    DynamicLibrary mine;
+    REQUIRE(mine.loadCopy(built).how == DynamicLibrary::Loaded::Copied);
+    const std::vector<std::string> loaded = namesIn(folder);
+    REQUIRE(loaded.size() == 3u);
+
+    // Not even tried: on Windows a loaded copy would stay anyway, and be said to.
+    DynamicLibrary::sweepCopies(built);
+    CHECK(namesIn(folder) == loaded);
+    CHECK(Vkm::Test::logText().empty());
+    CHECK(answerOf(mine) == 42);
+
+    other.stop();
+    mine.unload();
+    CHECK(namesIn(folder).size() == 2u);
+    DynamicLibrary::sweepCopies(built);
+    CHECK(namesIn(folder) == std::vector<std::string>{built.filename().string()});
+}
+
 TEST("a copy that cannot be deleted is said so, by unload and by sweepCopies") {
     const fs::path built  = builtLibrary();
     const fs::path folder = built.parent_path();
+    // For the sweep, which leaves this process's copy: one whose name gives no process.
+    const std::string left = built.stem().string() + ".loaded.17" + built.extension().string();
+    fs::copy_file(built, folder / left);
     DynamicLibrary library;
     REQUIRE(library.loadCopy(built).how == DynamicLibrary::Loaded::Copied);
     std::string copy;
     for (const std::string& name : namesIn(folder)) {
-        if (name != built.filename().string()) copy = name;
+        if (name != built.filename().string() && name != left) copy = name;
     }
     REQUIRE(!copy.empty());
 #if defined(_WIN32)
     // Loaded twice, so the first unload leaves it mapped, and Windows deletes no mapped file.
     DynamicLibrary again;
     REQUIRE(again.load(folder / copy));
+    DynamicLibrary held;
+    REQUIRE(held.load(folder / left));
 #else
     REQUIRE(::chmod(folder.c_str(), 0555) == 0);
     const bool writable = ::access(folder.c_str(), W_OK) == 0;
@@ -557,8 +592,9 @@ TEST("a copy that cannot be deleted is said so, by unload and by sweepCopies") {
     if (writable) Vkm::Test::skip("this user writes into a read-only folder");
 #endif
     CHECK(fs::exists(folder / copy));
+    CHECK(fs::exists(folder / left));
     CHECK(unloaded.find(copy) != std::string::npos);
-    CHECK(swept.find(copy) != std::string::npos);
+    CHECK(swept.find(left) != std::string::npos);
 }
 
 TEST("sweepCopies says so of a folder it cannot list, and nothing of one that is not there") {

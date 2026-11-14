@@ -3,10 +3,16 @@
 #include "vkm_platform/process/dynamic_library.h"
 
 #include <atomic>
+#include <charconv>
 #include <fstream>
+#include <string_view>
 
 #if !defined(_WIN32)
+    #include <cerrno>
+    #include <csignal>
+    #include <limits>
     #include <dlfcn.h>
+    #include <unistd.h>
 #endif
 
 #include "vkm_log/logger.h"
@@ -23,6 +29,45 @@ std::atomic<unsigned> g_copies{0};
 // The name every copy of @p built starts with: "<stem>.loaded.".
 std::string copyPrefix(const std::filesystem::path& built) {
     return built.stem().string() + ".loaded.";
+}
+
+// This process's copy @p n of @p built: "<stem>.loaded.<pid>.<n><extension>".
+std::string copyName(const std::filesystem::path& built, unsigned n) {
+#if defined(_WIN32)
+    const unsigned long pid = ::GetCurrentProcessId();
+#else
+    const unsigned long pid = static_cast<unsigned long>(::getpid());
+#endif
+    return copyPrefix(built) + std::to_string(pid) + "." + std::to_string(n) + built.extension().string();
+}
+
+// The process whose copy @p name is, read back from copyName's "<pid>.<n>" between a prefix of
+// @p prefixSize and an extension of @p extensionSize; 0, no process, for a name copyName never writes.
+unsigned long copyOwner(std::string_view name, size_t prefixSize, size_t extensionSize) {
+    if (name.size() < prefixSize + extensionSize) return 0;
+    const char* const first = name.data() + prefixSize;
+    const char* const last  = name.data() + name.size() - extensionSize;
+    unsigned long pid = 0;
+    unsigned long n   = 0;
+    const auto [dot, pidError] = std::from_chars(first, last, pid);
+    if (pidError != std::errc{} || dot == last || *dot != '.') return 0;
+    const auto [end, nError] = std::from_chars(dot + 1, last, n);
+    return nError == std::errc{} && end == last ? pid : 0;
+}
+
+// Whether process @p pid runs: no process has id 0, and one this process may not ask after is taken to.
+bool runs(unsigned long pid) {
+#if defined(_WIN32)
+    const HANDLE process = ::OpenProcess(SYNCHRONIZE, FALSE, pid);
+    if (!process) return ::GetLastError() == ERROR_ACCESS_DENIED;
+    const bool running = ::WaitForSingleObject(process, 0) == WAIT_TIMEOUT;
+    ::CloseHandle(process);
+    return running;
+#else
+    // kill() reads 0, and what is past pid_t's range, as a process group.
+    if (pid == 0 || pid > static_cast<unsigned long>(std::numeric_limits<pid_t>::max())) return false;
+    return ::kill(static_cast<pid_t>(pid), 0) == 0 || errno == EPERM;
+#endif
 }
 
 // Delete @p copy, a copy loadCopy made, saying so when it stays.
@@ -71,14 +116,12 @@ DynamicLibrary::Outcome DynamicLibrary::loadCopy(const std::filesystem::path& bu
     namespace fs = std::filesystem;
     unload();
 
-    // Sixteen names is a ceiling, not a dependency: a name already taken is stepped past and left, as
-    // another process, counting from zero too, may be loading it; sweepCopies clears what a process
-    // left behind.
+    // Sixteen names is a ceiling, not a dependency: a name already taken was left by an ended process
+    // that had this one's id. It is stepped past, and sweepCopies clears it once this process ends too.
     Outcome outcome;
     fs::path copy;
     for (int attempt = 0; attempt < 16; ++attempt) {
-        const std::string name = copyPrefix(built) + std::to_string(g_copies++) + built.extension().string();
-        copy = built.parent_path() / name;
+        copy = built.parent_path() / copyName(built, g_copies++);
         fs::copy_file(built, copy, outcome.error);
         if (outcome.error != std::errc::file_exists) break;
     }
@@ -113,12 +156,15 @@ void DynamicLibrary::sweepCopies(const std::filesystem::path& built) {
     const fs::path    extension = built.extension();
     for (fs::directory_iterator it(built.parent_path(), ec), end; !ec && it != end; it.increment(ec)) {
         const std::string name = it->path().filename().string();
-        if (name.rfind(prefix, 0) == 0 && it->path().extension() == extension) {
-            // Best effort, so said at Info: on Windows another process holding its copy is ordinary.
-            std::error_code held;
-            fs::remove(it->path(), held);
-            if (held) LOG_INFO("Cannot delete '%s': %s", it->path().string().c_str(), held.message().c_str());
-        }
+        if (name.rfind(prefix, 0) != 0 || it->path().extension() != extension) continue;
+
+        // Left while its process runs, which may be between making it and loading it.
+        if (runs(copyOwner(name, prefix.size(), extension.string().size()))) continue;
+
+        // Best effort, so said at Info: on Windows another program may hold the file open.
+        std::error_code held;
+        fs::remove(it->path(), held);
+        if (held) LOG_INFO("Cannot delete '%s': %s", it->path().string().c_str(), held.message().c_str());
     }
     // A folder that is not there holds no copy.
     if (ec && ec != std::errc::no_such_file_or_directory) {
