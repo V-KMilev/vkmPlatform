@@ -318,6 +318,48 @@ TEST("sweepCopies removes the copies a process left behind, and nothing else bes
     CHECK(namesIn(folder) == expected);
 }
 
+TEST("a copy that cannot be deleted is said so, by unload and by sweepCopies") {
+    const fs::path built  = builtLibrary();
+    const fs::path folder = built.parent_path();
+    DynamicLibrary library;
+    REQUIRE(library.loadCopy(built).how == DynamicLibrary::Loaded::Copied);
+    std::string copy;
+    for (const std::string& name : namesIn(folder)) {
+        if (name != built.filename().string()) copy = name;
+    }
+    REQUIRE(!copy.empty());
+#if defined(_WIN32)
+    // Loaded twice, so the first unload leaves it mapped, and Windows deletes no mapped file.
+    DynamicLibrary again;
+    REQUIRE(again.load(folder / copy));
+#else
+    REQUIRE(::chmod(folder.c_str(), 0555) == 0);
+    const bool writable = ::access(folder.c_str(), W_OK) == 0;
+#endif
+    library.unload();
+    const std::string unloaded = Vkm::Test::logText();
+    DynamicLibrary::sweepCopies(built);
+    const std::string swept = Vkm::Test::logText().substr(unloaded.size());
+#if !defined(_WIN32)
+    ::chmod(folder.c_str(), 0755);
+    if (writable) Vkm::Test::skip("this user writes into a read-only folder");
+#endif
+    CHECK(fs::exists(folder / copy));
+    CHECK(unloaded.find(copy) != std::string::npos);
+    CHECK(swept.find(copy) != std::string::npos);
+}
+
+TEST("sweepCopies says so of a folder it cannot list, and nothing of one that is not there") {
+    DynamicLibrary::sweepCopies(scratch() / "missing" / "game");
+    CHECK(Vkm::Test::logText().empty());
+
+    // A file where the folder would be.
+    const fs::path file = scratch() / "file";
+    Vkm::Test::writeText(file, "");
+    DynamicLibrary::sweepCopies(file / "game");
+    CHECK(Vkm::Test::logText().find(file.string()) != std::string::npos);
+}
+
 TEST("the executable's folder is the suite's, and the user's folders follow the environment") {
     // Wherever the build puts the suite: a consumer's build gathers executables in a folder of its own.
     REQUIRE(!Vkm::Platform::executableDir().empty());

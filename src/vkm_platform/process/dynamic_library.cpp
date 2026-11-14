@@ -24,6 +24,13 @@ std::string copyPrefix(const std::filesystem::path& built) {
     return built.stem().string() + ".loaded.";
 }
 
+// Delete @p copy, a copy loadCopy made, saying so when it stays.
+void deleteCopy(const std::filesystem::path& copy) {
+    std::error_code ec;
+    std::filesystem::remove(copy, ec);
+    if (ec) LOG_WARNING("Cannot delete '%s': %s", copy.string().c_str(), ec.message().c_str());
+}
+
 } // namespace
 
 DynamicLibrary::~DynamicLibrary() {
@@ -74,8 +81,7 @@ DynamicLibrary::Outcome DynamicLibrary::loadCopy(const std::filesystem::path& bu
         if (load(copy)) {
             m_copy = copy;
         } else {
-            std::error_code ignored;
-            fs::remove(copy, ignored);
+            deleteCopy(copy);
         }
         return outcome;
     }
@@ -101,9 +107,15 @@ void DynamicLibrary::sweepCopies(const std::filesystem::path& built) {
     for (fs::directory_iterator it(built.parent_path(), ec), end; !ec && it != end; it.increment(ec)) {
         const std::string name = it->path().filename().string();
         if (name.rfind(prefix, 0) == 0 && it->path().extension() == extension) {
+            // Best effort, so said at Info: on Windows another process holding its copy is ordinary.
             std::error_code held;
             fs::remove(it->path(), held);
+            if (held) LOG_INFO("Cannot delete '%s': %s", it->path().string().c_str(), held.message().c_str());
         }
+    }
+    // A folder that is not there holds no copy.
+    if (ec && ec != std::errc::no_such_file_or_directory) {
+        LOG_WARNING("Cannot look for copies of '%s': %s", built.string().c_str(), ec.message().c_str());
     }
 }
 
@@ -121,8 +133,7 @@ void DynamicLibrary::unload() {
 
     // After the unload, which held it locked on Windows.
     if (!m_copy.empty()) {
-        std::error_code ignored;
-        std::filesystem::remove(m_copy, ignored);
+        deleteCopy(m_copy);
         m_copy.clear();
     }
 }
