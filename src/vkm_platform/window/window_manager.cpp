@@ -324,7 +324,6 @@ std::vector<WindowSize> WindowManager::renderResolutions() const {
 
 namespace {
 
-// Each key's GLFW code, in Key's order.
 constexpr int GLFW_KEYS[] = {
     GLFW_KEY_SPACE, GLFW_KEY_APOSTROPHE, GLFW_KEY_COMMA, GLFW_KEY_MINUS, GLFW_KEY_PERIOD, GLFW_KEY_SLASH,
     GLFW_KEY_0, GLFW_KEY_1, GLFW_KEY_2, GLFW_KEY_3, GLFW_KEY_4,
@@ -350,13 +349,12 @@ constexpr int GLFW_KEYS[] = {
     GLFW_KEY_KP_ENTER, GLFW_KEY_KP_EQUAL,
     GLFW_KEY_LEFT_SHIFT, GLFW_KEY_LEFT_CONTROL, GLFW_KEY_LEFT_ALT, GLFW_KEY_LEFT_SUPER,
     GLFW_KEY_RIGHT_SHIFT, GLFW_KEY_RIGHT_CONTROL, GLFW_KEY_RIGHT_ALT, GLFW_KEY_RIGHT_SUPER, GLFW_KEY_MENU,
-};
+};  ///< Each key's GLFW code, in Key's order.
 
-// Each button's GLFW code, in MouseButton's order.
 constexpr int GLFW_BUTTONS[] = {
     GLFW_MOUSE_BUTTON_LEFT, GLFW_MOUSE_BUTTON_RIGHT, GLFW_MOUSE_BUTTON_MIDDLE, GLFW_MOUSE_BUTTON_4,
     GLFW_MOUSE_BUTTON_5, GLFW_MOUSE_BUTTON_6, GLFW_MOUSE_BUTTON_7, GLFW_MOUSE_BUTTON_8,
-};
+};  ///< Each button's GLFW code, in MouseButton's order.
 
 template<size_t N>
 constexpr bool rising(const int (&codes)[N]) {

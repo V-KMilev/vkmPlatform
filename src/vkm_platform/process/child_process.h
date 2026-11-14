@@ -90,10 +90,10 @@ class ChildProcess {
 
 #if defined(_WIN32)
         void* m_process = nullptr;
-        void* m_job = nullptr;    ///< Holds the program and all it starts, so stop() ends them together
-        void* m_pipe = nullptr;
+        void* m_job     = nullptr;  ///< Holds the program and all it starts, so stop() ends them together
+        void* m_pipe    = nullptr;
 #else
-        int m_pid = 0;            ///< Also its process group's id, which holds all it starts
+        int m_pid    = 0;   ///< Also its process group's id, which holds all it starts
         int m_pipeFd = -1;
 #endif
 };

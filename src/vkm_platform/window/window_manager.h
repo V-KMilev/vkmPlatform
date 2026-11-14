@@ -346,25 +346,25 @@ class WindowManager {
     private:
         GLFWwindow*                    m_windowHandle = nullptr;
         std::unique_ptr<WindowSurface> m_surface;  ///< The renderer's tie to the window; null headless.
-        std::string m_title;
+        std::string                    m_title;
 
         bool m_closeRequested = false;  ///< Ours rather than GLFW's, so a program with no window can still be
                                         ///< told to end.
 
-        int m_width  = 0;    ///< Framebuffer pixels.
+        int m_width  = 0;  ///< Framebuffer pixels.
         int m_height = 0;
 
-        int    m_windowWidth = 0;    ///< Screen coordinates, kept by callback.
-        double m_cursorX     = 0.0;  ///< Screen coordinates, kept by callback.
-        double m_cursorY     = 0.0;
-        CursorMode m_cursorMode = CursorMode::Normal;
-        bool       m_cursorFree = false;  ///< See setCursorFree: shown as Normal over m_cursorMode.
+        int        m_windowWidth = 0;      ///< Screen coordinates, kept by callback.
+        double     m_cursorX     = 0.0;    ///< Screen coordinates, kept by callback.
+        double     m_cursorY     = 0.0;
+        CursorMode m_cursorMode  = CursorMode::Normal;
+        bool       m_cursorFree  = false;  ///< See setCursorFree: shown as Normal over m_cursorMode.
 
         InputHandle  m_inputHandle;
         FrameLimiter m_frameLimiter;
 
-        WindowMode m_windowMode = WindowMode::Windowed;
-        bool       m_vsync      = false;
+        WindowMode               m_windowMode  = WindowMode::Windowed;
+        bool                     m_vsync       = false;
         std::vector<std::string> m_dropped;              ///< Until takeDroppedFiles().
         bool                     m_keepDropped = false;  ///< Whether a caller takes them.
 };

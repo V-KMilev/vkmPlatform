@@ -271,8 +271,12 @@ TEST("sweepCopies removes the copies a process left behind, and nothing else bes
 
     DynamicLibrary::sweepCopies(built);
     const std::vector<std::string> expected = [&] {
-        std::vector<std::string> names = {built.filename().string(), stem + ".loaded.notes.txt",
-                                          "other.loaded.3" + extension, stem + extension + ".bak"};
+        std::vector<std::string> names = {
+            built.filename().string(),
+            stem + ".loaded.notes.txt",
+            "other.loaded.3" + extension,
+            stem + extension + ".bak",
+        };
         std::sort(names.begin(), names.end());
         return names;
     }();

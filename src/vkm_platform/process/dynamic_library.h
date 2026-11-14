@@ -14,14 +14,18 @@ namespace Vkm::Platform {
  */
 class DynamicLibrary {
     public:
-        /// How loadCopy() went about loading a library.
+        /**
+         * @brief How loadCopy() went about loading a library.
+         */
         enum class Loaded : uint8_t {
             Copied,   ///< From a copy beside it.
             InPlace,  ///< From the library itself: its folder takes no copy.
             Refused,  ///< Not tried: the copy failed for another reason.
         };
 
-        /// What loadCopy() did, and why it made no copy when it made none.
+        /**
+         * @brief What loadCopy() did, and why it made no copy when it made none.
+         */
         struct Outcome {
             Loaded          how = Loaded::Refused;
             std::error_code error;  ///< Why no copy was made; empty when one was.

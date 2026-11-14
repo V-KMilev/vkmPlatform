@@ -26,7 +26,9 @@ enum class Key : uint8_t {
     Count  ///< Sentinel; keep last.
 };
 
-/// A mouse button: the three every mouse has, then the rest by number.
+/**
+ * @brief A mouse button: the three every mouse has, then the rest by number.
+ */
 enum class MouseButton : uint8_t {
     Left, Right, Middle, Button4, Button5, Button6, Button7, Button8,
     Count  ///< Sentinel; keep last.

@@ -62,7 +62,7 @@ class FrameLimiter {
         void sleepFor(std::chrono::steady_clock::duration span);
 
     private:
-        int m_targetFramerate = 0;
+        int                                   m_targetFramerate = 0;
         std::chrono::steady_clock::time_point m_frameStart;
 
         std::chrono::steady_clock::time_point m_deadline;  ///< The last frame's end, which the next is paced

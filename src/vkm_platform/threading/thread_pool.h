@@ -59,12 +59,12 @@ class ThreadPool {
 
             private:
                 void (*m_run)(const void* task, size_t index) = nullptr;
-                const void* m_task = nullptr;
-                size_t      m_count   = 0;          ///< Indices of the run queued last; set by addBatch.
-                size_t      m_claimed = 0;          ///< Indices handed out; guarded by the pool's mutex.
-                std::exception_ptr m_error;         ///< First an index threw; guarded by the pool's mutex.
+                const void*        m_task    = nullptr;
+                size_t             m_count   = 0;  ///< Indices of the run queued last; set by addBatch.
+                size_t             m_claimed = 0;  ///< Indices handed out; guarded by the pool's mutex.
+                std::exception_ptr m_error;        ///< First an index threw; guarded by the pool's mutex.
 
-                std::atomic<size_t> m_pending{0};   ///< Indices queued and not yet retired.
+                std::atomic<size_t> m_pending{0};  ///< Indices queued and not yet retired.
         };
 
     public:
@@ -149,9 +149,9 @@ class ThreadPool {
          * @brief One unit of work a worker takes: an owned task, or a claimed index of a Batch.
          */
         struct QueuedTask {
-            std::function<void()> function;           ///< When not a batch's.
-            Batch*                batch   = nullptr;
-            size_t                index   = 0;        ///< Once claimed.
+            std::function<void()> function;         ///< When not a batch's.
+            Batch*                batch = nullptr;
+            size_t                index = 0;        ///< Once claimed.
         };
 
     private:
@@ -193,9 +193,9 @@ class ThreadPool {
                                                    ///< allocates nothing.
         std::deque<QueuedTask> m_backgroundTasks;  ///< From addTask; drained when idle.
 
-        std::mutex m_tasksMutex;
+        std::mutex              m_tasksMutex;
         std::condition_variable m_tasksCV;
-        std::condition_variable m_doneCV;   ///< A batch counter dropped to 0
+        std::condition_variable m_doneCV;  ///< A batch counter dropped to 0
 };
 
 /**
