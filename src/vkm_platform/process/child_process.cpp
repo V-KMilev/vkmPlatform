@@ -166,7 +166,7 @@ bool ChildProcess::start(
     }
 
     SECURITY_ATTRIBUTES inherit{sizeof(SECURITY_ATTRIBUTES), nullptr, TRUE};
-    HANDLE readEnd = nullptr;
+    HANDLE readEnd  = nullptr;
     HANDLE writeEnd = nullptr;
     if (!CreatePipe(&readEnd, &writeEnd, &inherit, PIPE_BYTES)) {
         const std::string why = std::system_category().message(static_cast<int>(GetLastError()));
@@ -197,7 +197,7 @@ bool ChildProcess::start(
         &limits,
         sizeof(limits)
     );
-    const bool   created = limited && CreateProcessW(
+    const bool created = limited && CreateProcessW(
         nullptr,
         line.data(),
         nullptr,
@@ -322,7 +322,7 @@ bool ChildProcess::start(
 
     // Everything the child needs is made here: between fork and exec it may not allocate.
     const std::string path = program.string();
-    const std::string dir = workingDir.string();
+    const std::string dir  = workingDir.string();
     // A relative program is found from this process's working folder, as on Windows: the child
     // changes to workingDir before its exec.
     std::error_code unresolved;

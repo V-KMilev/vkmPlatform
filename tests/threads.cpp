@@ -297,7 +297,7 @@ TEST("a task shutdown drops is destroyed outside the pool's lock, so what it hol
     const Vkm::Test::Ended ended = Vkm::Test::inChild([] {
         // A deadlock ends the child here rather than hang the suite.
         alarm(10);
-        ThreadPool&         pool = ThreadPool::get();
+        ThreadPool& pool = ThreadPool::get();
         std::atomic<bool>   release{false};
         std::atomic<size_t> held{0};
         for (size_t i = 0; i < pool.threadCount(); ++i) {
