@@ -608,6 +608,29 @@ TEST("sweepCopies says so of a folder it cannot list, and nothing of one that is
     CHECK(Vkm::Test::logText().find(file.string()) != std::string::npos);
 }
 
+TEST("a program deeper in a tree than MAX_PATH finds the folder it is in") {
+    // Past Windows' 260 characters, and short of the page a Linux path is named in.
+    fs::path deep = scratch();
+    while (deep.string().size() < 300) deep /= "a_folder_further_down";
+    fs::create_directories(deep);
+    fs::copy_file(Vkm::Platform::executableDir() / VKM_TEST_LISTENER, deep / VKM_TEST_LISTENER);
+
+    // Run from the suite's folder, where Windows finds the libraries it loads. Windows starts a program
+    // past MAX_PATH only where long paths are turned on.
+    ChildProcess child;
+#if defined(_WIN32)
+    if (!child.start(deep / VKM_TEST_LISTENER, {"where"}, Vkm::Platform::executableDir())) {
+        Vkm::Test::skip("this system starts no program past MAX_PATH");
+    }
+#else
+    REQUIRE(child.start(deep / VKM_TEST_LISTENER, {"where"}, Vkm::Platform::executableDir()));
+#endif
+    std::string said = runToExit(child);
+    said.erase(said.find_last_not_of("\r\n") + 1);
+    std::error_code ec;
+    CHECK(fs::equivalent(said, deep, ec));
+}
+
 TEST("the executable's folder is the suite's, and the user's folders follow the environment") {
     // Wherever the build puts the suite: a consumer's build gathers executables in a folder of its own.
     REQUIRE(!Vkm::Platform::executableDir().empty());

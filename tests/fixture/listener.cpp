@@ -5,7 +5,7 @@
 // "finished" there and ends. Given "flood" it writes without a pause, ten seconds long; given "spill"
 // it starts a copy of itself given "flood" and, a moment on, says it is exiting and exits with 4.
 // Given "load" and a library, it first loads a copy of it and never asks, so stop() ends it with the
-// copy loaded, as a crash would.
+// copy loaded, as a crash would. Given "where", it says the folder it is in and ends.
 
 #include <chrono>
 #include <csignal>
@@ -51,6 +51,10 @@ void startCopy(char* self, const char* mode, char* file) {
 } // namespace
 
 int main(int argc, char** argv) {
+    if (argc > 1 && std::strcmp(argv[1], "where") == 0) {
+        std::printf("%s\n", Vkm::Platform::executableDir().string().c_str());
+        return 0;
+    }
     if (argc > 1 && std::strcmp(argv[1], "flood") == 0) {
         static const std::string block(65536, 'x');
         const auto until = std::chrono::steady_clock::now() + std::chrono::seconds(10);

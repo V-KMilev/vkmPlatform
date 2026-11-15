@@ -7,7 +7,8 @@ namespace Vkm::Platform {
 /**
  * @brief The folder the running executable is in.
  *
- * @return Its absolute path, or empty when the system does not say.
+ * @return Its absolute path, or empty, logged, when the system does not say: on Linux, past a
+ *         page's length.
  */
 std::filesystem::path executableDir();
 

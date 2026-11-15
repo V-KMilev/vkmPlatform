@@ -6,11 +6,8 @@
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
-
-#if !defined(_WIN32)
-    #include <climits>
-    #include <unistd.h>
-#endif
+#include <string>
+#include <system_error>
 
 #include "vkm_log/logger.h"
 
@@ -59,15 +56,27 @@ std::filesystem::path envPath(const char* name) {
 
 std::filesystem::path executableDir() {
 #if defined(_WIN32)
-    wchar_t buf[MAX_PATH];
-    const DWORD len = ::GetModuleFileNameW(nullptr, buf, MAX_PATH);
-    if (len == 0 || len >= MAX_PATH) return {};  // failed or truncated
-    return std::filesystem::path(buf, buf + len).parent_path();
+    // Past MAX_PATH where long paths are on: the name is cut short to the buffer, so it grows until the
+    // name fits, up to the longest path the system has.
+    constexpr DWORD LONGEST_PATH = 32768;
+    std::wstring name(MAX_PATH, L'\0');
+    for (;;) {
+        const DWORD size = static_cast<DWORD>(name.size());
+        const DWORD len  = ::GetModuleFileNameW(nullptr, name.data(), size);
+        if (len > 0 && len < size) return std::filesystem::path(name.substr(0, len)).parent_path();
+        if (len == 0 || size >= LONGEST_PATH) break;
+        name.resize(size * 2);
+    }
+    LOG_ERROR("The executable's own path cannot be read (error %lu)", ::GetLastError());
+    return {};
 #else
-    char buf[PATH_MAX];
-    const ssize_t len = ::readlink("/proc/self/exe", buf, sizeof(buf));
-    if (len <= 0 || static_cast<size_t>(len) >= sizeof(buf)) return {};
-    return std::filesystem::path(buf, buf + len).parent_path();
+    std::error_code ec;
+    const std::filesystem::path name = std::filesystem::read_symlink("/proc/self/exe", ec);
+    if (ec) {
+        LOG_ERROR("The executable's own path cannot be read: %s", ec.message().c_str());
+        return {};
+    }
+    return name.parent_path();
 #endif
 }
 
