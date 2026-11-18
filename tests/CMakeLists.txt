@@ -11,6 +11,8 @@ file(GLOB VKM_PLATFORM_TEST_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR
 add_executable(vkm_platform_tests ${CMAKE_CURRENT_SOURCE_DIR}/harness/main.cpp ${VKM_PLATFORM_TEST_SOURCES})
 # glfw for its key codes alone, which the map is checked against.
 target_link_libraries(vkm_platform_tests PRIVATE ${PROJECT_NAME} glfw)
+# Beside vkm_log, where Windows looks for the DLL a program needs.
+set_target_properties(vkm_platform_tests PROPERTIES RUNTIME_OUTPUT_DIRECTORY $<TARGET_FILE_DIR:vkm_log>)
 target_include_directories(vkm_platform_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 # The library's asserts flag, which check.h's VKM_TEST_LIBRARY_ASSERTS reads beside the file's NDEBUG.
 target_compile_definitions(vkm_platform_tests PRIVATE
@@ -41,6 +43,9 @@ add_dependencies(vkm_platform_tests vkm_platform_test_module)
 # A program the suite starts and stops, beside the suite: there it finds the libraries the suite does.
 add_executable(vkm_platform_test_listener ${CMAKE_CURRENT_SOURCE_DIR}/fixture/listener.cpp)
 target_link_libraries(vkm_platform_test_listener PRIVATE ${PROJECT_NAME})
+set_target_properties(vkm_platform_test_listener PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY $<TARGET_FILE_DIR:vkm_platform_tests>
+)
 add_dependencies(vkm_platform_tests vkm_platform_test_listener)
 
 # Every public header with the library's include path alone: the suite does not build when one
