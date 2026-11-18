@@ -23,6 +23,17 @@ cmake --build build
 ctest --test-dir build -L vkm_platform --output-on-failure
 ```
 
+It also builds alone, as CI does: from this repository's root,
+
+```sh
+cmake -S ci -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+ctest --test-dir build --output-on-failure
+```
+
+`ci/CMakeLists.txt` is a consumer that adds vkm_log, at the commit vkmEngine pins, and fails the
+build on a warning in the library or its suite.
+
 Work in `modules/vkmPlatform`, a checkout of this repository, and run the engine's suites too: they
 use the library as a game does. The engine's
 [CONTRIBUTING.md](https://github.com/V-KMilev/vkmEngine/blob/master/CONTRIBUTING.md#build-and-test)
